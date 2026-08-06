@@ -42,7 +42,25 @@
         .archive-session-count{color:#94a3b8;font-size:.74rem;font-weight:700;margin-top:5px;text-align:right}
         .archive-session-chevron{grid-area:arrow;width:44px;height:64px;display:grid;place-items:center;color:#1E88E5;font-size:1.6rem}
         @media(max-width:390px){.archive-session-card{padding:15px 13px;grid-template-columns:minmax(0,1fr) 38px}.archive-session-dates{gap:8px}.archive-session-dates span{font-size:.74rem}.archive-session-chevron{width:36px}}
-</style>
+
+        /* v10: تصنيفات منفصلة + فلترة أنعم + حاسبة حيّة */
+        #filterSheet{max-height:min(92dvh,820px);overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(22px + env(safe-area-inset-bottom));}
+        .filter-category-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-start;direction:rtl;}
+        .filter-category-chip{border:1.5px solid #d8e8f4;background:#fff;color:#607d96;border-radius:14px;padding:10px 14px;min-height:44px;font:800 13px Cairo,sans-serif;display:inline-flex;align-items:center;gap:8px;transition:.18s ease;}
+        .filter-category-chip.active{border-color:#2196f3;background:#eef7ff;color:#1689df;box-shadow:0 0 0 2px rgba(33,150,243,.06) inset;}
+        .filter-category-dot{width:9px;height:9px;border-radius:999px;display:inline-block;flex:0 0 auto;}
+        .cash-category-strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 8px;direction:rtl;}
+        .cash-category-strip::-webkit-scrollbar{display:none}
+        .cash-category-chip{white-space:nowrap;border:1px solid #dbe8f2;background:#fff;color:#7890a5;border-radius:999px;padding:8px 13px;font:800 12px Cairo,sans-serif;}
+        .cash-category-chip.active{background:#eaf6ff;border-color:#2196f3;color:#1689df;}
+        .calc-live-result{font:700 13px Cairo,sans-serif;color:#8aa0b4;text-align:right;min-height:22px;margin-top:3px;direction:rtl;}
+        .calc-memory-row{display:flex;gap:8px;margin:0 0 8px;direction:ltr;flex:0 0 auto;}
+        .calc-memory-bar{flex:1;border:1px solid #b9d5e9;background:#eaf5ff;color:#2196f3;border-radius:12px;min-height:42px;padding:8px 12px;font:800 16px Cairo,sans-serif;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .calc-memory-clear{width:58px;border:1px solid #dbe8f2;background:#fff;color:#7890a5;border-radius:12px;font:800 13px Cairo,sans-serif;}
+        #keypadModal.keyboard-open .calc-memory-row{display:none!important;}
+        #category-scope-note{font:700 12px Cairo,sans-serif;color:#94a3b8;text-align:center;padding-top:4px;}
+
+    </style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>دفتر كاش توب</title>
@@ -155,7 +173,8 @@
         .custom-radio.active .circle { border-color: #1E88E5; }
         .custom-radio.active .circle::after { content: ''; width: 10px; height: 10px; background-color: #1E88E5; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background-color: white; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 40; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background-color: white; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 40; direction:ltr; }
+        .bottom-nav .nav-btn{direction:rtl;}
         .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9ca3af; font-size: 0.75rem; font-weight: 600; width: 33%; background: none; border: none; }
         .nav-btn.active { color: #1E88E5; }
         .nav-btn i { font-size: 1.25rem; }
@@ -471,7 +490,8 @@
                 <button onclick="openReports('', 'cash')" class="cash-action"><span class="cash-action-icon"><i class="fas fa-chart-column"></i></span><span>التقارير</span></button>
                 <button onclick="finishCashSession()" class="cash-action"><span class="cash-action-icon"><i class="fas fa-circle-check"></i></span><span>إنهاء</span></button>
             </div>
-            <div class="flex justify-end items-center mb-3 px-1"><span class="text-brand font-bold text-lg">المعاملات <span class="text-gray-400 font-semibold">(<span id="cash-count">0</span>)</span></span></div>
+            <div class="flex justify-end items-center mb-2 px-1"><span class="text-brand font-bold text-lg">المعاملات <span class="text-gray-400 font-semibold">(<span id="cash-count">0</span>)</span></span></div>
+            <div id="cash-category-strip" class="cash-category-strip mb-2"></div>
             <div id="cash-list" class="space-y-3 records-safe-space"></div>
         </div>
 
@@ -519,6 +539,7 @@
                 <div class="flex justify-end items-center">
                     <input type="text" id="keypad-display" readonly class="text-5xl font-bold text-success bg-transparent border-none outline-none text-right w-full" value="0">
                 </div>
+                <div id="calc-live-result" class="calc-live-result">الناتج = 0</div>
             </div>
             
             <div class="keypad-note-row flex justify-end mb-6">
@@ -529,7 +550,7 @@
             </div>
             
             <div class="keypad-tools flex gap-2 mb-6">
-                <button onclick="openCategoryScreen()" class="flex-1 border border-gray-200 rounded-xl py-3 flex items-center justify-center gap-2 text-gray-600 bg-white active:bg-gray-50 font-bold text-sm shadow-sm">
+                <button id="keypad-category-btn" onclick="openCategoryScreen('cash')" class="flex-1 border border-gray-200 rounded-xl py-3 flex items-center justify-center gap-2 text-gray-600 bg-white active:bg-gray-50 font-bold text-sm shadow-sm">
                     <i class="fas fa-list-ul text-brand"></i> <span id="selected-category-text">إضافة فئة</span>
                 </button>
                 <button onclick="chooseTransactionImage()" class="flex-1 border border-gray-200 rounded-xl py-3 flex items-center justify-center gap-2 text-gray-600 bg-white active:bg-gray-50 font-bold text-sm shadow-sm">
@@ -539,6 +560,10 @@
             </div>
             
             <button onclick="confirmKeypad()" id="keypad-confirm-btn" class="keypad-confirm w-full bg-green-100 text-green-700 py-3 rounded-xl font-bold text-xl mb-4 shadow-sm active:opacity-75 transition">تأكيد</button>
+            <div class="calc-memory-row">
+                <button type="button" class="calc-memory-bar" onclick="recallCalcMemory()" title="استدعاء الذاكرة"><span id="calc-memory-label">MRC = 0</span></button>
+                <button type="button" class="calc-memory-clear" onclick="clearCalcMemory()" title="مسح الذاكرة">MC</button>
+            </div>
             
             <!-- لوحة المفاتيح -->
             <div class="keypad-grid grid grid-cols-4 gap-2 flex-1 mt-auto">
@@ -574,13 +599,13 @@
     <div id="categoryScreen" class="fixed inset-0 bg-white z-[70] hidden flex-col">
         <div class="flex items-center justify-between p-4 border-b shrink-0">
             <div class="w-10"></div>
-            <h2 class="text-xl font-bold text-brand">اختر فئة</h2>
+            <h2 id="category-screen-title" class="text-xl font-bold text-brand">اختر فئة</h2>
             <button onclick="closeCategoryScreen()" class="text-brand text-2xl w-10 h-10 flex items-center justify-center active:bg-gray-100 rounded-full"><i class="fas fa-times"></i></button>
         </div>
         <div class="p-4 shrink-0">
             <button onclick="openNewCategoryScreen()" class="w-full bg-blue-50 text-brand py-3 rounded-xl font-bold text-lg border border-blue-100 active:bg-blue-100 transition">إضافة فئة</button>
         </div>
-        <div class="px-4 pb-2 border-b"><span class="text-brand font-bold text-sm" id="cat-count">الفئات (0)</span></div>
+        <div class="px-4 pb-2 border-b"><span class="text-brand font-bold text-sm" id="cat-count">الفئات (0)</span><div id="category-scope-note"></div></div>
         <div class="flex-1 overflow-y-auto p-4 space-y-2" id="category-list"></div>
         <div class="p-4 border-t shrink-0">
             <button onclick="confirmCategory()" class="w-full bg-brand text-white py-4 rounded-xl font-bold text-xl shadow-lg active:bg-blue-600 transition">تأكيد</button>
@@ -638,6 +663,14 @@
                         <div class="custom-radio" onclick="selectFilterOption(this, 'sort', 'low')"><span class="text-sm font-bold">أصغر مبلغ</span><div class="circle"></div></div>
                     </div>
                 </div>
+                <div class="border rounded-xl p-4 bg-gray-50 border-gray-200">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <button type="button" onclick="openCategoryScreen('contact')" class="text-brand bg-blue-50 px-3 py-2 rounded-full text-xs font-bold"><i class="fas fa-plus-circle ml-1"></i>إدارة التصنيفات</button>
+                        <p class="text-brand font-bold text-sm text-right">فلتر حسب التصنيفات</p>
+                    </div>
+                    <div id="filter-category-options" class="filter-category-grid"></div>
+                    <p id="filter-category-empty" class="hidden text-xs text-gray-400 text-right mt-2">لا توجد تصنيفات لهذا القسم بعد.</p>
+                </div>
                 <button onclick="applyFilters()" class="w-full bg-brand text-white py-4 rounded-xl font-bold text-lg mt-2 active:bg-blue-600 shadow-md">تطبيق الترتيب</button>
             </div>
         </div>
@@ -667,7 +700,7 @@
 
                 <div class="border border-gray-300 rounded-xl p-4">
                     <div class="flex justify-between items-center mb-2">
-                        <button onclick="openCategoryScreen()" class="text-brand bg-blue-50 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                        <button onclick="openCategoryScreen('contact')" class="text-brand bg-blue-50 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
                             <i class="fas fa-plus"></i> إضافة تصنيفات
                         </button>
                         <label class="text-brand font-bold text-sm">التصنيفات</label>
@@ -754,7 +787,7 @@
             <div class="edit-categories-card">
                 <div class="edit-categories-head">
                     <span>التصنيفات</span>
-                    <button type="button" onclick="openCategoryScreen()"><i class="fas fa-plus-circle"></i> إدارة التصنيفات</button>
+                    <button type="button" onclick="openCategoryScreen('contact')"><i class="fas fa-plus-circle"></i> إدارة التصنيفات</button>
                 </div>
                 <div id="edit-person-category" class="edit-category-value">بدون تصنيف</div>
             </div>
@@ -1109,6 +1142,10 @@
         let currentFilterSort = 'new';
         let pendingFilterStatus = 'all';
         let pendingFilterSort = 'new';
+        let currentFilterCategory = 'all';
+        let pendingFilterCategory = 'all';
+        let cashFilterCategory = 'all';
+        let categoryContext = 'cash';
         let currentDetailName = '';
         let personDetailReturn = 'main';
         let editingPersonName = '';
@@ -1138,9 +1175,9 @@
 
         const categoryIcons = ['fa-tag','fa-cart-shopping','fa-box','fa-coins','fa-truck','fa-utensils','fa-house','fa-bag-shopping','fa-briefcase','fa-receipt','fa-gift','fa-wrench'];
         let categories = loadJSON('cashtop_cats', [
-            { id: 1, name: 'المبيعات', icon: 'fa-cart-shopping', color: '#fef3c7' },
-            { id: 2, name: 'ديون العملاء', icon: 'fa-user-group', color: '#e0e7ff' },
-            { id: 3, name: 'مداخيل أخرى', icon: 'fa-coins', color: '#dcfce7' }
+            { id: 1, name: 'المبيعات', icon: 'fa-cart-shopping', color: '#fef3c7', scope:'cash' },
+            { id: 2, name: 'ديون العملاء', icon: 'fa-user-group', color: '#e0e7ff', scope:'cash' },
+            { id: 3, name: 'مداخيل أخرى', icon: 'fa-coins', color: '#dcfce7', scope:'cash' }
         ]);
         let selectedCategory = null;
         let pendingCategoryColor = '#2196f3';
@@ -1172,8 +1209,30 @@
             cashArchives.forEach(s=>{s.id=s.id||s.closedAt||Date.now();s.openedAt=Number(s.openedAt)||Date.now();s.closedAt=Number(s.closedAt)||Date.now();s.records=Array.isArray(s.records)?s.records:[];s.records.forEach(r=>{r.timestamp=Number(r.timestamp)||Date.now();r.amount=Number(r.amount)||0;});});
             const fallbackIcons=['fa-cart-shopping','fa-user-group','fa-coins','fa-tag'];
             categories.forEach((c,i)=>{if(!String(c.icon||'').startsWith('fa-'))c.icon=fallbackIcons[i%fallbackIcons.length];});
+            migrateCategoryScopes();
             saveData();
         }
+        function migrateCategoryScopes(){
+            const legacy=categories.filter(c=>!c.scope);
+            if(!legacy.length)return;
+            const customerIds=new Set(),supplierIds=new Set();
+            Object.entries(contacts||{}).forEach(([k,v])=>{if(v?.categoryId==null)return;const id=String(v.categoryId);if(k.startsWith('customers:'))customerIds.add(id);else if(k.startsWith('suppliers:'))supplierIds.add(id);});
+            const additions=[];
+            legacy.forEach((cat,idx)=>{
+                const id=String(cat.id),cu=customerIds.has(id),su=supplierIds.has(id);
+                if(cu&&su){
+                    cat.scope='customers';
+                    const clone={...cat,id:`${cat.id}_sup_${Date.now()}_${idx}`,scope:'suppliers'};additions.push(clone);
+                    Object.keys(contacts).forEach(k=>{if(k.startsWith('suppliers:')&&String(contacts[k]?.categoryId)===id)contacts[k].categoryId=clone.id;});
+                }else if(cu)cat.scope='customers';
+                else if(su)cat.scope='suppliers';
+                else cat.scope='cash';
+            });
+            categories.push(...additions);
+        }
+        function normalizeCategoryScope(scope){return scope==='contact'?currentDebtTab:(scope||'cash');}
+        function categoriesForScope(scope=categoryContext){const wanted=normalizeCategoryScope(scope);return categories.filter(c=>(c.scope||'cash')===wanted);}
+        function categoryById(id){return categories.find(c=>String(c.id)===String(id))||null;}
         normalizeLegacyData();
 
         function personKey(name,type=currentDebtTab){return `${type}:${name}`;}
@@ -1194,7 +1253,7 @@
             setupAutocomplete();
             initPhonePicker();
             document.getElementById('searchInput')?.addEventListener('input',renderDebtsList);
-            renderDebtsList();renderCategoryPalette();renderCategoryIcons();renderCashList();updateFabText();renderProfileUI();
+            renderDebtsList();renderCategoryPalette();renderCategoryIcons();renderCashList();renderCashCategoryStrip();updateFabText();renderProfileUI();
             document.addEventListener('click',e=>{
                 if(!e.target.closest('#reminder-person-trigger')&&!e.target.closest('#reminder-person-menu'))document.getElementById('reminder-person-menu')?.classList.add('hidden');
                 if(!e.target.closest('#archive-session-trigger')&&!e.target.closest('#archive-session-menu'))document.getElementById('archive-session-menu')?.classList.add('hidden');
@@ -1207,18 +1266,20 @@
 
         // ================== التنقل ==================
         function switchMainPage(page){currentMainPage=page;document.querySelectorAll('.page-view').forEach(el=>el.classList.add('hidden'));document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));document.getElementById('nav-'+page)?.classList.add('active');const fab=document.getElementById('main-fab');if(page==='debts'){document.getElementById('page-debts').classList.remove('hidden');document.getElementById('header-title').innerText=profile.name||'كاش توب';fab.style.display='flex';renderDebtsList();}else if(page==='cash'){document.getElementById('page-cash').classList.remove('hidden');document.getElementById('header-title').innerText='دفتر النقدية';fab.style.display='none';renderCashList();}else{document.getElementById('page-more').classList.remove('hidden');document.getElementById('header-title').innerText='المزيد';fab.style.display='none';renderProfileUI();}}
-        function switchDebtTab(tab){currentDebtTab=tab;document.querySelectorAll('.top-tab-btn').forEach(el=>el.classList.remove('active'));document.getElementById('tab-'+tab)?.classList.add('active');currentFilterStatus='all';currentFilterSort='new';updateFabText();renderDebtsList();}
+        function switchDebtTab(tab){currentDebtTab=tab;document.querySelectorAll('.top-tab-btn').forEach(el=>el.classList.remove('active'));document.getElementById('tab-'+tab)?.classList.add('active');currentFilterStatus='all';currentFilterSort='new';currentFilterCategory='all';pendingFilterCategory='all';selectedCategory=null;updateFabText();renderDebtsList();}
         function updateFabText(){const el=document.getElementById('fab-text'),fab=document.getElementById('main-fab');if(el)el.textContent=currentDebtTab==='customers'?'عميل':'مورد';if(fab){const i=fab.querySelector('i');if(i)i.className=currentDebtTab==='customers'?'fas fa-user-plus':'fas fa-truck-ramp-box';}}
 
         // ================== الديون والتصفية ==================
         function buildBalances(type=currentDebtTab){const balances={};records.filter(r=>r.type===type).forEach(r=>{if(!balances[r.name])balances[r.name]={name:r.name,debit:0,credit:0,timestamp:0,lastDate:'',type};balances[r.name].debit+=Number(r.debit)||0;balances[r.name].credit+=Number(r.credit)||0;if(r.timestamp>=balances[r.name].timestamp){balances[r.name].timestamp=r.timestamp;balances[r.name].lastDate=todayLabel(r.timestamp);}});return Object.values(balances).map(b=>({...b,net:b.credit-b.debit}));}
-        function renderDebtsList(){const list=document.getElementById('persons-list'),empty=document.getElementById('empty-state');if(!list)return;const search=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();let people=buildBalances();const totals=people.reduce((a,p)=>({debit:a.debit+p.debit,credit:a.credit+p.credit}),{debit:0,credit:0});document.getElementById('lbl-debit').innerText=fmtMoney(totals.debit);document.getElementById('lbl-credit').innerText=fmtMoney(totals.credit);if(search)people=people.filter(p=>p.name.toLowerCase().includes(search)||(getContact(p.name,p.type).phone||'').includes(search));if(currentFilterStatus==='debit')people=people.filter(p=>p.net<0);else if(currentFilterStatus==='credit')people=people.filter(p=>p.net>0);else if(currentFilterStatus==='settled')people=people.filter(p=>Math.abs(p.net)<.0001);if(currentFilterSort==='new')people.sort((a,b)=>b.timestamp-a.timestamp);else if(currentFilterSort==='old')people.sort((a,b)=>a.timestamp-b.timestamp);else if(currentFilterSort==='high')people.sort((a,b)=>Math.abs(b.net)-Math.abs(a.net));else if(currentFilterSort==='low')people.sort((a,b)=>Math.abs(a.net)-Math.abs(b.net));document.getElementById('list-title').innerText=`${currentDebtTab==='customers'?'العملاء':'الموردين'} (${people.length})`;list.innerHTML='';if(!people.length){empty.style.display='flex';list.style.display='none';return;}empty.style.display='none';list.style.display='block';people.forEach(p=>{const pos=p.net>0,neg=p.net<0,color=pos?'text-success':neg?'text-danger':'text-gray-400',label=pos?'أعطيت':neg?'أخذت':'مسدد',bar=pos?'bg-success':neg?'bg-danger':'bg-gray-200';list.insertAdjacentHTML('beforeend',`<div onclick="openPersonDetailByEncoded('${encodeURIComponent(p.name)}')" class="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm active:bg-blue-50 transition cursor-pointer relative overflow-hidden"><div class="absolute right-0 top-0 bottom-0 w-1 ${bar}"></div><div class="text-left w-24 shrink-0"><p class="${color} font-extrabold text-lg" dir="ltr">₪ ${fmtMoney(Math.abs(p.net))}</p><p class="text-xs text-gray-400 mt-1 text-center">${label}</p></div><div class="flex items-center gap-4 flex-1 justify-end"><div class="text-right"><p class="font-extrabold text-gray-800 text-lg">${escapeHTML(p.name)}</p><p class="text-xs text-gray-400 mt-1">${escapeHTML(p.lastDate||'')}</p></div><div class="w-12 h-12 rounded-full bg-blue-50 text-brand flex items-center justify-center text-lg"><i class="fas ${p.type==='suppliers'?'fa-truck':'fa-user'}"></i></div></div></div>`);});}
+        function renderDebtsList(){const list=document.getElementById('persons-list'),empty=document.getElementById('empty-state');if(!list)return;const search=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();let people=buildBalances();const totals=people.reduce((a,p)=>({debit:a.debit+p.debit,credit:a.credit+p.credit}),{debit:0,credit:0});document.getElementById('lbl-debit').innerText=fmtMoney(totals.debit);document.getElementById('lbl-credit').innerText=fmtMoney(totals.credit);if(search)people=people.filter(p=>p.name.toLowerCase().includes(search)||(getContact(p.name,p.type).phone||'').includes(search));if(currentFilterStatus==='debit')people=people.filter(p=>p.net<0);else if(currentFilterStatus==='credit')people=people.filter(p=>p.net>0);else if(currentFilterStatus==='settled')people=people.filter(p=>Math.abs(p.net)<.0001);if(currentFilterCategory!=='all')people=people.filter(p=>String(getContact(p.name,p.type).categoryId||'')===String(currentFilterCategory));if(currentFilterSort==='new')people.sort((a,b)=>b.timestamp-a.timestamp);else if(currentFilterSort==='old')people.sort((a,b)=>a.timestamp-b.timestamp);else if(currentFilterSort==='high')people.sort((a,b)=>Math.abs(b.net)-Math.abs(a.net));else if(currentFilterSort==='low')people.sort((a,b)=>Math.abs(a.net)-Math.abs(b.net));const fcat=currentFilterCategory==='all'?null:categoryById(currentFilterCategory);document.getElementById('list-title').innerText=`${currentDebtTab==='customers'?'العملاء':'الموردين'} (${people.length})${fcat?' • '+fcat.name:''}`;list.innerHTML='';if(!people.length){empty.style.display='flex';list.style.display='none';return;}empty.style.display='none';list.style.display='block';people.forEach(p=>{const pos=p.net>0,neg=p.net<0,color=pos?'text-success':neg?'text-danger':'text-gray-400',label=pos?'أعطيت':neg?'أخذت':'مسدد',bar=pos?'bg-success':neg?'bg-danger':'bg-gray-200',c=getContact(p.name,p.type),cat=categoryById(c.categoryId);list.insertAdjacentHTML('beforeend',`<div onclick="openPersonDetailByEncoded('${encodeURIComponent(p.name)}')" class="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm active:bg-blue-50 transition cursor-pointer relative overflow-hidden"><div class="absolute right-0 top-0 bottom-0 w-1 ${bar}"></div><div class="text-left w-24 shrink-0"><p class="${color} font-extrabold text-lg" dir="ltr">₪ ${fmtMoney(Math.abs(p.net))}</p><p class="text-xs text-gray-400 mt-1 text-center">${label}</p></div><div class="flex items-center gap-4 flex-1 justify-end"><div class="text-right"><p class="font-extrabold text-gray-800 text-lg">${escapeHTML(p.name)}</p><p class="text-xs text-gray-400 mt-1">${escapeHTML(p.lastDate||'')}${cat?` • ${escapeHTML(cat.name)}`:''}</p></div><div class="w-12 h-12 rounded-full bg-blue-50 text-brand flex items-center justify-center text-lg"><i class="fas ${p.type==='suppliers'?'fa-truck':'fa-user'}"></i></div></div></div>`);});}
         function openPersonDetailByEncoded(name){openPersonDetail(decodeURIComponent(name));}
-        function openFilterModal(){pendingFilterStatus=currentFilterStatus;pendingFilterSort=currentFilterSort;syncFilterUI();const m=document.getElementById('filterModal'),s=document.getElementById('filterSheet');m.classList.remove('hidden');requestAnimationFrame(()=>s.classList.add('show'));}
+        function openFilterModal(){pendingFilterStatus=currentFilterStatus;pendingFilterSort=currentFilterSort;pendingFilterCategory=currentFilterCategory;syncFilterUI();renderFilterCategories();const m=document.getElementById('filterModal'),s=document.getElementById('filterSheet');m.classList.remove('hidden');requestAnimationFrame(()=>s.classList.add('show'));}
         function closeFilterModal(){const m=document.getElementById('filterModal'),s=document.getElementById('filterSheet');s.classList.remove('show');setTimeout(()=>m.classList.add('hidden'),220);}
         function selectFilterOption(el,group,value){if(group==='status')pendingFilterStatus=value;else pendingFilterSort=value;el.parentElement.querySelectorAll('.custom-radio').forEach(x=>x.classList.remove('active'));el.classList.add('active');}
+        function renderFilterCategories(){const box=document.getElementById('filter-category-options'),empty=document.getElementById('filter-category-empty');if(!box)return;const cats=categoriesForScope(currentDebtTab);box.innerHTML=`<button type="button" class="filter-category-chip ${pendingFilterCategory==='all'?'active':''}" onclick="selectFilterCategory('all')"><i class="fas fa-layer-group"></i>الكل</button>`+cats.map(c=>`<button type="button" class="filter-category-chip ${String(pendingFilterCategory)===String(c.id)?'active':''}" onclick="selectFilterCategory('${String(c.id).replace(/'/g,"\'")}')"><span class="filter-category-dot" style="background:${escapeHTML(c.color||'#2196f3')}"></span>${escapeHTML(c.name)}</button>`).join('');empty?.classList.toggle('hidden',cats.length>0);}
+        function selectFilterCategory(id){pendingFilterCategory=id;renderFilterCategories();}
         function syncFilterUI(){document.querySelectorAll('#filterModal .custom-radio').forEach(el=>el.classList.remove('active'));const sm={all:0,debit:1,settled:2,credit:3},tm={new:0,old:1,high:2,low:3};const s=document.querySelectorAll('#filterModal .custom-radio-group')[0]?.querySelectorAll('.custom-radio'),t=document.querySelectorAll('#filterModal .custom-radio-group')[1]?.querySelectorAll('.custom-radio');s?.[sm[pendingFilterStatus]]?.classList.add('active');t?.[tm[pendingFilterSort]]?.classList.add('active');}
-        function applyFilters(){currentFilterStatus=pendingFilterStatus;currentFilterSort=pendingFilterSort;closeFilterModal();renderDebtsList();toast('تم تطبيق التصفية');}
+        function applyFilters(){currentFilterStatus=pendingFilterStatus;currentFilterSort=pendingFilterSort;currentFilterCategory=pendingFilterCategory;closeFilterModal();renderDebtsList();toast(currentFilterCategory==='all'?'تم تطبيق التصفية':`تم عرض تصنيف ${categoryById(currentFilterCategory)?.name||''}`);}
 
         // ================== إضافة / تعديل عميل أو مورد + الدول ==================
         function initPhonePicker(){ /* أعلام الدول أزيلت بطلب المستخدم: حقل رقم عادي فقط. */ }
@@ -1226,31 +1287,64 @@
         function readPhoneField(){const input=document.getElementById('add-phone');let raw=(input?.value||'').trim();if(!raw)return{phone:''};raw=raw.replace(/[^0-9+]/g,'');if(raw.startsWith('00'))raw='+'+raw.slice(2);const digits=raw.replace(/\D/g,'');return{phone:digits};}
         function openAddModal(){editingPersonName='';selectedCategory=null;document.getElementById('add-name').value='';setPhoneField('',currentDebtTab==='customers'?'ps':'ps');document.getElementById('add-modal-title').innerText=currentDebtTab==='customers'?'إضافة عميل':'إضافة مورد';document.getElementById('name-suggestions').classList.add('hidden');updateCategoryButton();document.getElementById('addPersonModal').classList.remove('hidden');}
         function closeAddModal(){document.getElementById('addPersonModal').classList.add('hidden');editingPersonName='';}
-        function setupAutocomplete(){const input=document.getElementById('add-name'),box=document.getElementById('name-suggestions');if(!input||!box)return;const show=()=>{if(editingPersonName){box.classList.add('hidden');return;}const val=input.value.trim().toLowerCase();box.innerHTML='';const names=[...new Set(records.filter(r=>r.type===currentDebtTab).map(r=>r.name))];const matches=val?names.filter(n=>n.toLowerCase().includes(val)):names;if(!matches.length){box.classList.add('hidden');return;}box.classList.remove('hidden');matches.slice(0,20).forEach(name=>{const c=getContact(name,currentDebtTab);const div=document.createElement('div');div.className='app-dropdown-option';div.innerHTML=`<span class="text-brand"><i class="fas fa-user-check"></i></span><div class="flex-1 text-right"><div class="font-bold">${escapeHTML(name)}</div><div class="text-xs text-gray-400" dir="ltr">${c.phone?('+'+escapeHTML(String(c.phone).replace(/^\+/,''))):''}</div></div>`;div.onclick=()=>{input.value=name;setPhoneField(c.phone||'');box.classList.add('hidden');};box.appendChild(div);});};input.addEventListener('focus',show);input.addEventListener('input',show);document.addEventListener('click',e=>{if(e.target!==input&&!box.contains(e.target))box.classList.add('hidden');});}
+        function setupAutocomplete(){const input=document.getElementById('add-name'),box=document.getElementById('name-suggestions');if(box){box.innerHTML='';box.classList.add('hidden');box.setAttribute('aria-hidden','true');}if(input){input.setAttribute('autocomplete','off');input.addEventListener('input',()=>box?.classList.add('hidden'));}}
         function editCurrentPerson(){const c=getContact();editingPersonName=currentDetailName;document.getElementById('add-modal-title').innerText=currentDebtTab==='customers'?'تعديل العميل':'تعديل المورد';document.getElementById('add-name').value=currentDetailName;setPhoneField(c.phone||'');selectedCategory=categories.find(x=>x.id===c.categoryId)||null;updateCategoryButton();document.getElementById('name-suggestions').classList.add('hidden');document.getElementById('addPersonModal').classList.remove('hidden');}
         function savePerson(){const name=document.getElementById('add-name').value.trim();const phoneInfo=readPhoneField();if(!name){Swal.fire({icon:'error',title:'الاسم مطلوب',confirmButtonText:'حسناً'});return;}if(editingPersonName){const old=editingPersonName;records.forEach(r=>{if(r.type===currentDebtTab&&r.name===old)r.name=name;});const oldKey=personKey(old,currentDebtTab),newKey=personKey(name,currentDebtTab);contacts[newKey]={...(contacts[oldKey]||{}),phone:phoneInfo.phone,categoryId:selectedCategory?.id||contacts[oldKey]?.categoryId||null};if(oldKey!==newKey)delete contacts[oldKey];reminders.forEach(x=>{if(x.type===currentDebtTab&&x.name===old)x.name=name;});currentDetailName=name;document.getElementById('detail-name').innerText=name;editingPersonName='';saveData();closeAddModal();renderPersonDetailList();renderDebtsList();toast('تم تحديث البيانات');return;}const exists=records.some(r=>r.type===currentDebtTab&&r.name===name);contacts[personKey(name,currentDebtTab)]={...(getContact(name,currentDebtTab)),phone:phoneInfo.phone,categoryId:selectedCategory?.id||null};if(!exists)records.push({id:Date.now(),type:currentDebtTab,name,note:'إضافة الحساب',debit:0,credit:0,date:'اليوم',time:shortTime(Date.now()),timestamp:Date.now()});saveData();closeAddModal();renderDebtsList();toast(exists?'تم تحديث بيانات جهة الاتصال':'تمت إضافة الحساب');}
 
         // ================== الفئات ==================
-        function openCategoryScreen(){renderCategories();document.getElementById('categoryScreen').classList.remove('hidden');document.getElementById('categoryScreen').classList.add('flex');}
-        function closeCategoryScreen(){document.getElementById('categoryScreen').classList.add('hidden');document.getElementById('categoryScreen').classList.remove('flex');}
-        function renderCategories(){const list=document.getElementById('category-list');document.getElementById('cat-count').innerText=`الفئات (${categories.length})`;list.innerHTML='';categories.forEach(cat=>{const sel=selectedCategory&&selectedCategory.id===cat.id;const div=document.createElement('div');div.className=`flex items-center justify-between p-4 border rounded-xl cursor-pointer ${sel?'bg-blue-50 border-brand':'bg-white border-gray-200'}`;div.onclick=()=>{selectedCategory=cat;renderCategories();};div.innerHTML=`<div class="custom-radio ${sel?'active':''}" style="border:none;padding:0"><div class="circle"></div></div><div class="flex items-center gap-4"><span class="font-bold">${escapeHTML(cat.name)}</span><div class="w-10 h-10 rounded flex items-center justify-center text-brand" style="background:${cat.color}">${categoryIconHTML(cat)}</div></div>`;list.appendChild(div);});}
-        function confirmCategory(){updateCategoryButton();closeCategoryScreen();}
+        function openCategoryScreen(context='auto'){
+            if(context==='auto')context=(keypadType==='in'||keypadType==='out')?'cash':currentDebtTab;
+            categoryContext=normalizeCategoryScope(context);
+            const allowed=categoriesForScope(categoryContext);
+            if(selectedCategory&&!allowed.some(c=>String(c.id)===String(selectedCategory.id)))selectedCategory=null;
+            const title=document.getElementById('category-screen-title'),note=document.getElementById('category-scope-note');
+            const label=categoryContext==='cash'?'تصنيفات النقدية':categoryContext==='customers'?'تصنيفات العملاء':'تصنيفات الموردين';
+            if(title)title.textContent=label;if(note)note.textContent=`أي تصنيف جديد سيُحفظ داخل ${label.replace('تصنيفات ','') } فقط`;
+            renderCategories();document.getElementById('categoryScreen').classList.remove('hidden');document.getElementById('categoryScreen').classList.add('flex');
+        }
+        function closeCategoryScreen(){document.getElementById('categoryScreen').classList.add('hidden');document.getElementById('categoryScreen').classList.remove('flex');if(!document.getElementById('filterModal')?.classList.contains('hidden'))renderFilterCategories();}
+        function renderCategories(){const list=document.getElementById('category-list'),cats=categoriesForScope(categoryContext);document.getElementById('cat-count').innerText=`الفئات (${cats.length})`;list.innerHTML='';if(!cats.length){list.innerHTML='<div class="text-center text-gray-400 py-12"><i class="fas fa-tags text-4xl text-blue-100 mb-3"></i><div class="font-bold">لا توجد تصنيفات بعد</div></div>';return;}cats.forEach(cat=>{const sel=selectedCategory&&String(selectedCategory.id)===String(cat.id);const div=document.createElement('div');div.className=`flex items-center justify-between p-4 border rounded-xl cursor-pointer ${sel?'bg-blue-50 border-brand':'bg-white border-gray-200'}`;div.onclick=()=>{selectedCategory=cat;renderCategories();};div.innerHTML=`<div class="custom-radio ${sel?'active':''}" style="border:none;padding:0"><div class="circle"></div></div><div class="flex items-center gap-4"><span class="font-bold">${escapeHTML(cat.name)}</span><div class="w-10 h-10 rounded flex items-center justify-center text-brand" style="background:${cat.color}">${categoryIconHTML(cat)}</div></div>`;list.appendChild(div);});}
+        function confirmCategory(){updateCategoryButton();closeCategoryScreen();if(categoryContext==='cash')renderCashCategoryStrip();}
         function updateCategoryButton(){const btn=document.getElementById('selected-category-text');if(btn)btn.innerHTML=selectedCategory?`${categoryIconHTML(selectedCategory,'ml-1')} ${escapeHTML(selectedCategory.name)}`:'إضافة فئة';const p=document.getElementById('selected-cat-add-person');if(p)p.innerHTML=selectedCategory?`<span class="font-bold text-brand">${categoryIconHTML(selectedCategory,'ml-1')} ${escapeHTML(selectedCategory.name)}</span> تم اختيار الفئة`:'استخدم تصنيفات مخصصة لتجميع جهات الاتصال والتصفية بسرعة';}
         function openNewCategoryScreen(){document.getElementById('cat-name-input').value='';pendingCategoryColor=colorsPalette[11];pendingCategoryIcon='fa-tag';renderCategoryPalette();renderCategoryIcons();document.getElementById('newCategoryScreen').classList.remove('hidden');document.getElementById('newCategoryScreen').classList.add('flex');}
         function closeNewCategoryScreen(){document.getElementById('newCategoryScreen').classList.add('hidden');document.getElementById('newCategoryScreen').classList.remove('flex');}
         function renderCategoryPalette(){const pal=document.getElementById('color-palette');if(!pal)return;pal.innerHTML='';colorsPalette.forEach(c=>pal.insertAdjacentHTML('beforeend',`<button type="button" onclick="pendingCategoryColor='${c}';renderCategoryPalette()" class="color-circle" style="background:${c}">${c===pendingCategoryColor?'<i class="fas fa-check"></i>':''}</button>`));}
         function renderCategoryIcons(){const pal=document.getElementById('category-icon-palette');if(!pal)return;pal.innerHTML='';categoryIcons.forEach(icon=>pal.insertAdjacentHTML('beforeend',`<button type="button" onclick="pendingCategoryIcon='${icon}';renderCategoryIcons()" class="w-11 h-11 rounded-xl border ${icon===pendingCategoryIcon?'border-brand bg-blue-50 text-brand':'border-gray-200 text-gray-500'} flex items-center justify-center"><i class="fas ${icon}"></i></button>`));const prev=document.getElementById('cat-icon-preview');if(prev)prev.className=`fas ${pendingCategoryIcon}`;}
-        function saveNewCategory(){const name=document.getElementById('cat-name-input').value.trim();if(!name){toast('اكتب اسم الفئة','error');return;}const cat={id:Date.now(),name,icon:pendingCategoryIcon,color:pendingCategoryColor};categories.push(cat);selectedCategory=cat;saveData();closeNewCategoryScreen();renderCategories();updateCategoryButton();toast('تمت إضافة الفئة');}
+        function saveNewCategory(){const name=document.getElementById('cat-name-input').value.trim();if(!name){toast('اكتب اسم الفئة','error');return;}const cat={id:Date.now(),name,icon:pendingCategoryIcon,color:pendingCategoryColor,scope:normalizeCategoryScope(categoryContext)};categories.push(cat);selectedCategory=cat;saveData();closeNewCategoryScreen();renderCategories();updateCategoryButton();renderFilterCategories();renderCashCategoryStrip();toast('تمت إضافة الفئة');}
 
         // ================== لوحة العمليات وإضافة الصورة ==================
-        function openKeypad(type){keypadType=type;calcExpression='0';isNewInput=true;pendingImageData='';document.getElementById('keypad-display').value='0';document.getElementById('keypad-note').value='';document.getElementById('image-btn-label').innerText='إضافة صورة';selectedCategory=categories[0]||null;updateCategoryButton();const map={in:['دخل','text-success','bg-green-100 text-green-700'],out:['مصروف','text-danger','bg-red-100 text-red-700'],credit:['أعطيت (لك)','text-success','bg-green-100 text-green-700'],debit:['أخذت (عليك)','text-danger','bg-red-100 text-red-700']};const [txt,color,bg]=map[type]||map.in;document.getElementById('keypad-header-title').innerText=txt;document.getElementById('keypad-header-title').className=`text-xl font-bold ${color}`;document.getElementById('keypad-subtitle').innerText=txt;document.getElementById('keypad-display').className=`text-5xl font-bold bg-transparent border-none outline-none text-right w-full ${color}`;document.getElementById('keypad-confirm-btn').className=`w-full py-3 rounded-xl font-bold text-xl mb-4 shadow-sm active:opacity-75 transition ${bg}`;document.getElementById('keypadModal').classList.remove('hidden');document.getElementById('keypadModal').classList.add('flex');}
+        function openKeypad(type){keypadType=type;calcExpression='0';isNewInput=true;pendingImageData='';document.getElementById('keypad-display').value='0';document.getElementById('keypad-note').value='';document.getElementById('image-btn-label').innerText='إضافة صورة';const isCash=type==='in'||type==='out';categoryContext=isCash?'cash':currentDebtTab;selectedCategory=isCash?(categoriesForScope('cash')[0]||null):null;updateCategoryButton();const catBtn=document.getElementById('keypad-category-btn');if(catBtn)catBtn.style.display=isCash?'flex':'none';const map={in:['دخل','text-success','bg-green-100 text-green-700'],out:['مصروف','text-danger','bg-red-100 text-red-700'],credit:['أعطيت (لك)','text-success','bg-green-100 text-green-700'],debit:['أخذت (عليك)','text-danger','bg-red-100 text-red-700']};const [txt,color,bg]=map[type]||map.in;document.getElementById('keypad-header-title').innerText=txt;document.getElementById('keypad-header-title').className=`text-xl font-bold ${color}`;document.getElementById('keypad-subtitle').innerText=txt;document.getElementById('keypad-display').className=`text-5xl font-bold bg-transparent border-none outline-none text-right w-full ${color}`;document.getElementById('keypad-confirm-btn').className=`w-full py-3 rounded-xl font-bold text-xl mb-4 shadow-sm active:opacity-75 transition ${bg}`;updateCalcDisplay();document.getElementById('keypadModal').classList.remove('hidden');document.getElementById('keypadModal').classList.add('flex');}
         function closeKeypad(){document.getElementById('keypadModal').classList.add('hidden');document.getElementById('keypadModal').classList.remove('flex');}
         function evaluateExpression(expr){const safe=String(expr).replace(/×/g,'*').replace(/÷/g,'/');if(!/^[0-9+\-*/.()\s]+$/.test(safe))throw new Error('bad');const v=Function(`"use strict";return (${safe})`)();if(!Number.isFinite(v))throw new Error('bad');return v;}
-        function calcInput(val){if(val==='AC'){calcExpression='0';isNewInput=true;}else if(val==='back'){calcExpression=calcExpression.length>1?calcExpression.slice(0,-1):'0';}else if(val==='M+'||val==='M-'){try{const v=evaluateExpression(calcExpression);calcMemory=val==='M+'?calcMemory+v:calcMemory-v;toast(`الذاكرة: ${moneyRaw(calcMemory)}`,'info');}catch(e){toast('العملية غير صالحة','error');}}else if(['+','-','*','/'].includes(val)){if(!/[+\-*/]$/.test(calcExpression))calcExpression+=val;isNewInput=false;}else if(val==='='){try{calcExpression=String(evaluateExpression(calcExpression));isNewInput=true;}catch(e){toast('العملية غير صالحة','error');return;}}else{if(isNewInput&&calcExpression==='0'&&val!=='.')calcExpression=val;else calcExpression+=val;isNewInput=false;}document.getElementById('keypad-display').value=calcExpression.replace(/\*/g,'×').replace(/\//g,'÷');}
+        function formatCalcValue(v){if(!Number.isFinite(Number(v)))return'0';const n=Number(v);return Math.abs(n-Math.round(n))<1e-10?String(Math.round(n)):String(Number(n.toFixed(10)));}
+        function liveCalcValue(){let expr=String(calcExpression||'0').trim();expr=expr.replace(/[+\-*/.]+$/,'');if(!expr)return 0;try{return evaluateExpression(expr)}catch(_){return null}}
+        function updateCalcDisplay(){const d=document.getElementById('keypad-display'),live=document.getElementById('calc-live-result'),mem=document.getElementById('calc-memory-label');if(d)d.value=String(calcExpression||'0').replace(/\*/g,'×').replace(/\//g,'÷');const v=liveCalcValue();if(live)live.textContent=v==null?'الناتج = —':`الناتج = ${formatCalcValue(v)}`;if(mem)mem.textContent=`MRC = ${formatCalcValue(calcMemory)}`;}
+        function currentCalcValue(){const v=liveCalcValue();if(v==null||!Number.isFinite(v))throw new Error('bad');return v;}
+        function recallCalcMemory(){calcExpression=formatCalcValue(calcMemory);isNewInput=true;updateCalcDisplay();}
+        function clearCalcMemory(){calcMemory=0;updateCalcDisplay();toast('تم مسح ذاكرة الحاسبة','info');}
+        function calcInput(val){
+            if(val==='AC'){calcExpression='0';isNewInput=true;}
+            else if(val==='back'){if(isNewInput){calcExpression='0';isNewInput=false;}else calcExpression=calcExpression.length>1?calcExpression.slice(0,-1):'0';}
+            else if(val==='M+'||val==='M-'){
+                try{const v=currentCalcValue();calcMemory=val==='M+'?calcMemory+v:calcMemory-v;isNewInput=true;toast(`${val} → MRC ${formatCalcValue(calcMemory)}`,'info');}catch(e){toast('أكمل العملية الحسابية أولاً','error');}
+            }
+            else if(['+','-','*','/'].includes(val)){
+                if(/[+\-*/]$/.test(calcExpression))calcExpression=calcExpression.slice(0,-1)+val;else calcExpression+=val;isNewInput=false;
+            }
+            else if(val==='='){
+                try{calcExpression=formatCalcValue(evaluateExpression(calcExpression));isNewInput=true;}catch(e){toast('العملية غير صالحة','error');return;}
+            }
+            else{
+                if(isNewInput){calcExpression=val==='.'?'0.':val;isNewInput=false;}
+                else if(val==='.'&&/([0-9.]+)$/.test(calcExpression)&&RegExp.$1.includes('.'))return;
+                else calcExpression+=val;
+            }
+            updateCalcDisplay();
+        }
         function chooseTransactionImage(){document.getElementById('transaction-image-input').click();}
         async function handleTransactionImage(event){const file=event.target.files?.[0];if(!file)return;if(!file.type.startsWith('image/')){toast('اختر صورة فقط','error');return;}try{pendingImageData=await compressImage(file,1200,.78);document.getElementById('image-btn-label').innerText='صورة مرفقة';toast('تم إرفاق الصورة');}catch(e){toast('تعذر قراءة الصورة','error');}event.target.value='';}
         function compressImage(file,maxSide=1200,quality=.78){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{let w=img.width,h=img.height,s=Math.min(1,maxSide/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',quality));};img.src=reader.result;};reader.readAsDataURL(file);});}
-        function confirmKeypad(){let amount=0;try{amount=evaluateExpression(calcExpression);}catch(e){}if(amount<=0){toast('أدخل مبلغاً صحيحاً','error');return;}const note=document.getElementById('keypad-note').value.trim()||document.getElementById('keypad-header-title').innerText,now=Date.now();if(keypadType==='in'||keypadType==='out'){cashRecords.push({id:now,type:keypadType,amount,note,catName:selectedCategory?.name||'',catIcon:selectedCategory?.icon||'fa-tag',image:pendingImageData||'',date:'اليوم',time:shortTime(now),timestamp:now});saveData();renderCashList();closeKeypad();showReceiptScreen(amount,keypadType,'دفتر النقدية');}else{if(!currentDetailName){toast('اختر عميلاً أو مورداً أولاً','error');return;}records.push({id:now,type:currentDebtTab,name:currentDetailName,note,debit:keypadType==='debit'?amount:0,credit:keypadType==='credit'?amount:0,image:pendingImageData||'',date:'اليوم',time:shortTime(now),timestamp:now});saveData();renderPersonDetailList();renderDebtsList();closeKeypad();showReceiptScreen(amount,keypadType,currentDetailName);}}
+        function confirmKeypad(){let amount=0;try{amount=evaluateExpression(calcExpression);}catch(e){}if(amount<=0){toast('أدخل مبلغاً صحيحاً','error');return;}const note=document.getElementById('keypad-note').value.trim()||document.getElementById('keypad-header-title').innerText,now=Date.now();if(keypadType==='in'||keypadType==='out'){cashRecords.push({id:now,type:keypadType,amount,note,categoryId:selectedCategory?.id||null,catName:selectedCategory?.name||'',catIcon:selectedCategory?.icon||'fa-tag',image:pendingImageData||'',date:'اليوم',time:shortTime(now),timestamp:now});saveData();renderCashList();closeKeypad();showReceiptScreen(amount,keypadType,'دفتر النقدية');}else{if(!currentDetailName){toast('اختر عميلاً أو مورداً أولاً','error');return;}records.push({id:now,type:currentDebtTab,name:currentDetailName,note,debit:keypadType==='debit'?amount:0,credit:keypadType==='credit'?amount:0,image:pendingImageData||'',date:'اليوم',time:shortTime(now),timestamp:now});saveData();renderPersonDetailList();renderDebtsList();closeKeypad();showReceiptScreen(amount,keypadType,currentDetailName);}}
 
         // ================== تفاصيل الشخص / الاتصال ==================
         function openPersonDetail(name){currentDetailName=name;document.getElementById('detail-name').innerText=name;renderPersonDetailList();const m=document.getElementById('personDetailModal');m.classList.remove('hidden');m.classList.add('flex');}
@@ -1285,7 +1379,9 @@
         function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}
 
         // ================== دفتر النقدية / الإنهاء / الأرشيف ==================
-        function renderCashList(){const list=document.getElementById('cash-list');if(!list)return;const sorted=[...cashRecords].sort((a,b)=>b.timestamp-a.timestamp);let tin=0,tout=0;cashRecords.forEach(r=>r.type==='in'?tin+=Number(r.amount):tout+=Number(r.amount));const bal=tin-tout,balEl=document.getElementById('cash-balance');balEl.innerText=fmtMoney(Math.abs(bal));balEl.closest('p').className=`text-4xl font-extrabold mb-2 ${bal>=0?'text-success':'text-danger'}`;document.getElementById('cash-in').innerText=fmtMoney(tin);document.getElementById('cash-out').innerText=fmtMoney(tout);document.getElementById('cash-count').innerText=sorted.length;document.getElementById('cash-brand-name').innerText=profile.name||'كاش توب';list.innerHTML='';if(!sorted.length){list.innerHTML='<div class="text-center text-gray-400 py-14"><div class="professional-empty-icon"><i class="fas fa-receipt"></i></div><div class="font-bold text-lg">لا توجد معاملات بعد</div><div class="text-sm mt-2">سجّل الدخل أو المصروف لبدء دفتر النقدية</div></div>';return;}sorted.forEach(r=>{const incoming=r.type==='in';list.insertAdjacentHTML('beforeend',`<div onclick="openSingleTransaction(${r.id},'cash')" class="archive-row bg-white rounded-xl border border-gray-100 p-4 flex items-center justify-between cursor-pointer shadow-sm"><div class="text-left"><div class="${incoming?'text-success':'text-danger'} font-extrabold text-lg" dir="ltr">₪ ${fmtMoney(r.amount)}</div><div class="text-xs text-gray-400">${todayLabel(r.timestamp)} ${shortTime(r.timestamp)}</div></div><div class="flex items-center gap-3"><div class="text-right"><div class="font-bold">${escapeHTML(r.note||(incoming?'دخل':'مصروف'))}</div><div class="text-xs text-gray-400">${escapeHTML(r.catName||'بدون فئة')}</div></div>${r.image?`<img class="image-thumb" src="${r.image}" alt="">`:`<div class="w-12 h-12 rounded-xl ${incoming?'bg-green-100 text-success':'bg-red-50 text-danger'} flex items-center justify-center text-xl"><i class="fas ${incoming?'fa-plus':'fa-minus'}"></i></div>`}</div></div>`);});}
+        function renderCashCategoryStrip(){const box=document.getElementById('cash-category-strip');if(!box)return;const cats=categoriesForScope('cash');box.innerHTML=`<button type="button" class="cash-category-chip ${cashFilterCategory==='all'?'active':''}" onclick="setCashCategoryFilter('all')">الكل</button>`+cats.map(c=>`<button type="button" class="cash-category-chip ${String(cashFilterCategory)===String(c.id)?'active':''}" data-cash-cat="${escapeHTML(String(c.id))}">${escapeHTML(c.name)}</button>`).join('');box.querySelectorAll('[data-cash-cat]').forEach(btn=>btn.onclick=()=>setCashCategoryFilter(btn.dataset.cashCat));}
+        function setCashCategoryFilter(id){cashFilterCategory=id;renderCashList();}
+        function renderCashList(){const list=document.getElementById('cash-list');if(!list)return;renderCashCategoryStrip();let sorted=[...cashRecords].sort((a,b)=>b.timestamp-a.timestamp);let tin=0,tout=0;cashRecords.forEach(r=>r.type==='in'?tin+=Number(r.amount):tout+=Number(r.amount));if(cashFilterCategory!=='all'){const cat=categoryById(cashFilterCategory);sorted=sorted.filter(r=>String(r.categoryId||'')===String(cashFilterCategory)||(!r.categoryId&&cat&&String(r.catName||'')===String(cat.name)));}const bal=tin-tout,balEl=document.getElementById('cash-balance');balEl.innerText=fmtMoney(Math.abs(bal));balEl.closest('p').className=`text-4xl font-extrabold mb-2 ${bal>=0?'text-success':'text-danger'}`;document.getElementById('cash-in').innerText=fmtMoney(tin);document.getElementById('cash-out').innerText=fmtMoney(tout);document.getElementById('cash-count').innerText=sorted.length;document.getElementById('cash-brand-name').innerText=profile.name||'كاش توب';list.innerHTML='';if(!sorted.length){list.innerHTML='<div class="text-center text-gray-400 py-14"><div class="professional-empty-icon"><i class="fas fa-receipt"></i></div><div class="font-bold text-lg">لا توجد معاملات ضمن هذا التصنيف</div><div class="text-sm mt-2">اختر تصنيفاً آخر أو سجّل معاملة جديدة</div></div>';return;}sorted.forEach(r=>{const incoming=r.type==='in';list.insertAdjacentHTML('beforeend',`<div onclick="openSingleTransaction(${r.id},'cash')" class="archive-row bg-white rounded-xl border border-gray-100 p-4 flex items-center justify-between cursor-pointer shadow-sm"><div class="text-left"><div class="${incoming?'text-success':'text-danger'} font-extrabold text-lg" dir="ltr">₪ ${fmtMoney(r.amount)}</div><div class="text-xs text-gray-400">${todayLabel(r.timestamp)} ${shortTime(r.timestamp)}</div></div><div class="flex items-center gap-3"><div class="text-right"><div class="font-bold">${escapeHTML(r.note||(incoming?'دخل':'مصروف'))}</div><div class="text-xs text-gray-400">${escapeHTML(r.catName||'بدون فئة')}</div></div>${r.image?`<img class="image-thumb" src="${r.image}" alt="">`:`<div class="w-12 h-12 rounded-xl ${incoming?'bg-green-100 text-success':'bg-red-50 text-danger'} flex items-center justify-center text-xl"><i class="fas ${incoming?'fa-plus':'fa-minus'}"></i></div>`}</div></div>`);});}
         async function finishCashSession(){if(!cashRecords.length){toast('لا توجد معاملات لإنهائها','info');return;}let tin=0,tout=0;cashRecords.forEach(r=>r.type==='in'?tin+=Number(r.amount):tout+=Number(r.amount));const res=await Swal.fire({title:'إنهاء دفتر النقدية؟',html:`<div class="text-right leading-8">سيتم نقل <b>${cashRecords.length}</b> معاملة إلى الأرشيف ثم تصفير دفتر النقدية بالكامل.<br>الدخل: <b>${moneyRaw(tin)} ₪</b><br>المصروف: <b>${moneyRaw(tout)} ₪</b></div>`,icon:'question',showCancelButton:true,confirmButtonText:'إنهاء وأرشفة',cancelButtonText:'إلغاء'});if(!res.isConfirmed)return;const sorted=[...cashRecords].sort((a,b)=>a.timestamp-b.timestamp),closed=Date.now(),session={id:closed,openedAt:sorted[0]?.timestamp||closed,closedAt:closed,records:JSON.parse(JSON.stringify(cashRecords))};cashArchives.push(session);cashRecords=[];currentArchiveSessionId=session.id;saveData();renderCashList();toast('تمت الأرشفة وتصفير دفتر النقدية');setTimeout(()=>openArchive(session.id),180);}
         function openArchive(sessionId=null){document.getElementById('archiveModal').classList.add('show');currentArchiveTab='overview';const sorted=[...cashArchives].sort((a,b)=>b.closedAt-a.closedAt);currentArchiveSessionId=sessionId||currentArchiveSessionId||sorted[0]?.id||null;renderArchiveSessionMenu();renderArchive();}
         function closeArchive(){document.getElementById('archiveModal').classList.remove('show');document.getElementById('archive-session-menu').classList.add('hidden');}
@@ -1593,6 +1689,7 @@ function visibleAccountsForPdf(){
   const q=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();let people=buildBalances(currentDebtTab);
   if(q)people=people.filter(p=>p.name.toLowerCase().includes(q)||(getContact(p.name,p.type).phone||'').includes(q));
   if(currentFilterStatus==='debit')people=people.filter(p=>p.net<0);else if(currentFilterStatus==='credit')people=people.filter(p=>p.net>0);else if(currentFilterStatus==='settled')people=people.filter(p=>Math.abs(p.net)<.0001);
+  if(currentFilterCategory!=='all')people=people.filter(p=>String(getContact(p.name,p.type).categoryId||'')===String(currentFilterCategory));
   if(currentFilterSort==='new')people.sort((a,b)=>b.timestamp-a.timestamp);else if(currentFilterSort==='old')people.sort((a,b)=>a.timestamp-b.timestamp);else if(currentFilterSort==='high')people.sort((a,b)=>Math.abs(b.net)-Math.abs(a.net));else if(currentFilterSort==='low')people.sort((a,b)=>Math.abs(a.net)-Math.abs(b.net));
   return people;
 }

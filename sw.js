@@ -1,5 +1,5 @@
 'use strict';
-const VERSION='ct-ready-v9-20260806-1';
+const VERSION='ct-ready-v10-20260806-1';
 const STATIC=VERSION+'-static';
 const RUNTIME=VERSION+'-runtime';
 const SHELL=['./','./index.html','./app.html','./c.html','./admin.html','./app-logo.png','./direct-cloud.js','./cashtop-sync.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png'];

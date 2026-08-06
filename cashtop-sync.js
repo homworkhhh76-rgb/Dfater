@@ -791,6 +791,16 @@ async function hydrateLegacyFromIndexedDB(){
     saveData();refreshVisibleUI();return true;
   }catch(e){console.warn('hydrate idb',e);return false}
 }
+async function migrateCategoryScopesV10(){
+  if(await getMeta('categoryScopeMigratedV10',false))return;
+  try{
+    if(typeof migrateCategoryScopes==='function')migrateCategoryScopes();
+    for(const c of categories)await putEntity('category',c.id,c,{sortTs:Number(c.id)||Date.now(),queue:true});
+    for(const [k,c] of Object.entries(contacts||{}))await putEntity('contact',k,c,{queue:true});
+    saveData();await setMeta('categoryScopeMigratedV10',true);scheduleAutoSync(250);
+  }catch(e){console.warn('category scope migration v10',e)}
+}
+
 async function buildBackup(){
   if(navigator.onLine)await syncNow(false);
   const map=new Map((await getAllKindPayloads('archive_record')).map(r=>[String(r.id),r]));
@@ -890,7 +900,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   window.loginCompany=()=>login();window.logoutCompany=()=>logout();window.manualSync=()=>syncNow(true);window.installCashTop=()=>chooseInstall();
   const k=document.getElementById('login-company-key');if(k)k.addEventListener('keydown',e=>{if(e.key==='Enter')login()});
   if(!bootAuthUI())return;
-  wrapLegacyMutations();await requestPersistentStorage();await hydrateLegacyFromIndexedDB();await migrateLegacy();await updateSyncUI();updateInstallButton();renderArchiveSessions();validateSession(false);scheduleAutoSync(500);
+  wrapLegacyMutations();await requestPersistentStorage();await hydrateLegacyFromIndexedDB();await migrateCategoryScopesV10();await migrateLegacy();await updateSyncUI();updateInstallButton();renderArchiveSessions();validateSession(false);scheduleAutoSync(500);
   setInterval(()=>{if(session){validateSession(false);if(navigator.onLine)scheduleAutoSync(100)}},5*60*1000);
 });
 
