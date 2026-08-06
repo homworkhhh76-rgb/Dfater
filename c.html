@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>سجل المعاملات - Cash Top</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Cairo,system-ui,sans-serif;color:#243a56;background:#fff}body{padding-bottom:38px}.wrap{width:min(720px,100%);margin:auto;padding:18px 18px 40px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 22px}.brand{display:flex;align-items:center;gap:10px}.logo{width:48px;height:48px;border-radius:16px;background:#eaf6ff;color:#2296e5;display:grid;place-items:center;font-size:23px;font-weight:900}.brand small{display:block;color:#94a9ba;margin-top:2px}.wa{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#19bd62;color:#fff;text-decoration:none;font-size:20px}.hero{padding:24px 0 14px}.hero h1{margin:0;font-size:clamp(25px,7vw,38px);font-weight:800;line-height:1.5;color:#243a56}.sub{color:#8aa4b8;font-size:14px;margin-top:4px}.balance-label{color:#8ba6bb;margin-top:28px;font-weight:700}.balance{font-size:clamp(38px,11vw,58px);font-weight:500;color:#57bf64;direction:ltr;text-align:right;line-height:1.2}.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0 12px}.sum{border:1px solid #eaf0f4;border-radius:18px;padding:15px;background:#fbfdff}.sum span{display:block;color:#8ca6b9;font-size:12px;font-weight:700}.sum strong{display:block;margin-top:4px;font-size:20px;direction:ltr}.sum.in strong{color:#59bc62}.sum.out strong{color:#ef5e69}.section-title{display:flex;justify-content:space-between;align-items:center;margin:26px 0 8px}.section-title h2{font-size:17px;margin:0}.section-title span{font-size:12px;color:#98adbd}.list{border-top:1px solid #eef2f5}.row{display:grid;grid-template-columns:58px minmax(0,1fr) 115px;gap:12px;align-items:center;min-height:94px;border-bottom:1px solid #eef2f5;padding:12px 0}.ico{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:27px;font-weight:400}.ico.in{background:#edf9ef;color:#4caf50}.ico.out{background:#fff1f2;color:#ef5966}.main{min-width:0}.main b{display:block;font-size:15px;color:#2a415d}.main .run{font-size:12px;color:#8ea7b9;margin-top:4px}.main .note{font-size:11px;color:#a0b1bf;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.amt{text-align:left;direction:ltr;font-size:18px;font-weight:700}.amt.in{color:#59bc62}.amt.out{color:#ef5e69}.amt small{display:block;direction:rtl;color:#9db0be;font-size:11px;font-weight:600;margin-top:3px}.more{width:100%;margin-top:18px;border:1px solid #cbe6f7;background:#fff;color:#268fce;border-radius:14px;padding:13px;font-family:inherit;font-weight:800}.empty{text-align:center;color:#93a8b8;padding:60px 20px}.error{margin:18vh auto 0;width:min(520px,calc(100% - 34px));border:1px solid #f3d5d8;background:#fff8f8;border-radius:22px;padding:26px;text-align:center}.hidden{display:none!important}.footer{text-align:center;color:#b2c0cb;font-size:11px;padding:30px 0 6px}@media(max-width:430px){.wrap{padding-left:16px;padding-right:16px}.row{grid-template-columns:50px minmax(0,1fr) 95px;gap:9px}.ico{width:46px;height:46px}.amt{font-size:16px}}
+</style>
+</head>
+<body>
+<div id="app" class="wrap hidden">
+  <div class="top">
+    <div class="brand"><div class="logo">CT</div><div><b id="companyName">كاش توب</b><small id="companyAddress"></small></div></div>
+    <a id="waBtn" class="wa hidden" href="#" aria-label="واتساب">☏</a>
+  </div>
+  <section class="hero">
+    <div class="sub" id="customerPhone"></div>
+    <h1>سجل معاملات <span id="customerName"></span></h1>
+    <div class="balance-label">الرصيد الحالي</div>
+    <div id="balance" class="balance">₪ 0.00</div>
+  </section>
+  <div class="summary">
+    <div class="sum in"><span>إجمالي الذي أعطيته</span><strong id="totalCredit">₪ 0.00</strong></div>
+    <div class="sum out"><span>إجمالي الذي أخذته</span><strong id="totalDebit">₪ 0.00</strong></div>
+  </div>
+  <div class="section-title"><h2>المعاملات</h2><span id="count">0 معاملة</span></div>
+  <div id="list" class="list"></div>
+  <button id="moreBtn" class="more hidden">تحميل معاملات أقدم</button>
+  <div class="footer">Cash Top • سجل خاص بهذا العميل</div>
+</div>
+<div id="error" class="error hidden"><div style="font-size:36px;margin-bottom:10px">⌁</div><b>الرابط غير متاح</b><div id="errorText" style="color:#9aaebe;margin-top:8px;font-size:13px">تحقق من الرابط وحاول مرة أخرى.</div></div>
+<script src="./direct-cloud.js"></script>
+<script>
+(function(){
+'use strict';
+const key=decodeURIComponent((location.hash||'').replace(/^#\/?/,'').trim()||new URLSearchParams(location.search).get('k')||'');
+let cursor=null,loading=false,running=null,rendered=0;
+const $=id=>document.getElementById(id),money=n=>'₪ '+(Number(n)||0).toFixed(2),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmt(ts){return new Date(Number(ts)||Date.now()).toLocaleString('ar-EG',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}
+async function fetchPage(first=false){if(loading)return;loading=true;$('moreBtn').disabled=true;try{const q=new URLSearchParams({key,limit:'40'});if(cursor){q.set('beforeTs',cursor.beforeTs);q.set('beforeId',cursor.beforeId)}const d=await CashTopDirectAPI.request('/public/customer?'+q.toString());if(first){$('companyName').textContent=d.company?.name||'كاش توب';$('companyAddress').textContent=d.company?.address||'';$('customerName').textContent=d.customer?.name||'';$('customerPhone').textContent=d.customer?.phone||'';$('balance').textContent=money(Math.abs(d.summary?.balance||0));$('balance').style.color=Number(d.summary?.balance||0)<0?'#ef5966':'#57bf64';$('totalCredit').textContent=money(d.summary?.totalCredit||0);$('totalDebit').textContent=money(d.summary?.totalDebit||0);$('count').textContent=`${Number(d.summary?.count||0)} معاملة`;running=Number(d.summary?.balance||0);const phone=String(d.customer?.phone||'').replace(/\D/g,'');if(phone){$('waBtn').href='https://wa.me/'+phone;$('waBtn').classList.remove('hidden')}$('app').classList.remove('hidden')}
+for(const r of d.transactions||[]){const out=Number(r.debit)>0,delta=(Number(r.credit)||0)-(Number(r.debit)||0),after=running,amt=out?Number(r.debit||0):Number(r.credit||0);$('list').insertAdjacentHTML('beforeend',`<div class="row"><div class="ico ${out?'out':'in'}">${out?'↑':'↓'}</div><div class="main"><b>${fmt(r.timestamp)}</b><div class="run">الرصيد: <span dir="ltr">${money(Math.abs(after))}</span></div><div class="note">${esc(r.note||'')}</div></div><div class="amt ${out?'out':'in'}">${money(amt)}<small>${out?'أخذت':'أعطيت'}</small></div></div>`);running-=delta;rendered++}
+cursor=d.cursor;$('moreBtn').classList.toggle('hidden',!d.hasMore);if(!rendered)$('list').innerHTML='<div class="empty">لا توجد معاملات حالية.</div>';}catch(e){if(first){$('errorText').textContent=e.message||'تعذر فتح الرابط';$('error').classList.remove('hidden')}}finally{loading=false;$('moreBtn').disabled=false}}
+$('moreBtn').addEventListener('click',()=>fetchPage(false));if(!key){$('error').classList.remove('hidden');$('errorText').textContent='مفتاح العميل غير موجود في الرابط.'}else fetchPage(true);
+})();
+</script>
+</body>
+</html>
