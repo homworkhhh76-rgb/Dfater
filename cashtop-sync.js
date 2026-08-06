@@ -5,6 +5,9 @@ const SESSION_KEY='cashtop_cloud_session_v3';
 const API_KEY='cashtop_api_base_v3';
 const DEFAULT_API='/api';
 const MAX_OUTBOX_BATCH=100;
+const AUTO_REMOTE_PULL_MS=90*1000;
+const SESSION_VALIDATE_MS=60*1000;
+const LAZY_REMOTE_CACHE_MS=90*1000;
 const ARCHIVE_DOM_LIMIT=240;
 const ARCHIVE_ROW_ESTIMATE=92;
 let session=readSession();
@@ -19,7 +22,10 @@ let currentArchivedRecord=null;
 let currentArchivedDebtRecord=null;
 let installPrompt=null;
 let applyingRemote=false;
-let lastValidateAt=0;
+let lastValidateAt=Number(session?.lastValidatedAt||0);
+let lazyRemoteCache=new Map();
+let debtArchiveSummaryCache=new Map();
+let forceNextRemotePull=true;
 let lastSyncError='';
 let localObjectUrls=new Set();
 
@@ -28,8 +34,19 @@ window.CashTopSync={
   storeArchiveSession,resolveRecordImage,chooseInstall,requestPersistentStorage,
   showStorageInfo,buildBackup,restoreBackup,hydrateLegacyFromIndexedDB,apiBase:()=>apiBase(),session:()=>session,
   archiveDebtRecords,listDebtArchive,debtArchiveSummary,openDebtArchivedTransaction,restoreDebtArchivedTransaction,deleteDebtArchivedTransaction,restoreCashArchivedTransaction,moveDebtArchivePerson,restoreDebtArchiveBatch,deleteDebtArchiveBatch,
-  deleteEntityAndImage,deleteImageAsset,downloadRecordImage
+  deleteEntityAndImage,deleteImageAsset,downloadRecordImage,isSubscriptionExpired,canWrite
 };
+
+
+function isSubscriptionExpired(){
+  const exp=Number(session?.company?.expiresAt||0);
+  return !!(exp&&Date.now()>=exp);
+}
+function canWrite(showToast=true){
+  if(!isSubscriptionExpired())return true;
+  if(showToast)try{toast('اشتراكك انتهى','error')}catch(_){}
+  return false;
+}
 
 function readSession(){
   try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null')}catch{return null}
@@ -54,7 +71,7 @@ function idbName(){
 function openDb(){
   if(dbPromise)return dbPromise;
   dbPromise=new Promise((resolve,reject)=>{
-    const req=indexedDB.open(idbName(),4);
+    const req=indexedDB.open(idbName(),5);
     req.onupgradeneeded=()=>{
       const db=req.result;
       let items;
@@ -67,6 +84,7 @@ function openDb(){
       if(!db.objectStoreNames.contains('outbox'))out=db.createObjectStore('outbox',{keyPath:'opId'});else out=req.transaction.objectStore('outbox');
       if(!out.indexNames.contains('createdAt'))out.createIndex('createdAt','createdAt');
       if(!out.indexNames.contains('kind'))out.createIndex('kind','kind');
+      if(!out.indexNames.contains('entityKey'))out.createIndex('entityKey','entityKey');
       if(!db.objectStoreNames.contains('blobs'))db.createObjectStore('blobs',{keyPath:'id'});
       if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});
     };
@@ -107,16 +125,36 @@ function cloudPayload(payload){
   if(String(p.imageUrl||'').startsWith('data:image/'))delete p.imageUrl;
   return p;
 }
+function payloadEquivalent(a,b){
+  try{return JSON.stringify(a||{})===JSON.stringify(b||{})}catch{return false}
+}
+function entityQueueKey(kind,id){return `${String(kind)}:${String(id)}`}
+async function queueLatestEntityOp(op){
+  const db=await openDb(),tx=db.transaction('outbox','readwrite'),store=tx.objectStore('outbox'),ek=entityQueueKey(op.kind,op.id),idx=store.index('entityKey');
+  // Keep only the newest unsent state for an entity. The indexed lookup keeps
+  // large archive batches O(1)-ish instead of scanning the whole queue each time.
+  await new Promise((resolve,reject)=>{const req=idx.getAllKeys(ek);req.onerror=()=>reject(req.error);req.onsuccess=()=>{for(const key of req.result||[])store.delete(key);store.put({...op,entityKey:ek});resolve()}});
+  await txDone(tx);
+}
+async function migrateOutboxEconomyV14(){
+  if(await getMeta('outboxEconomyV14',false))return;
+  const db=await openDb(),tx=db.transaction('outbox','readonly'),all=await reqP(tx.objectStore('outbox').getAll());
+  const latest=new Map(),special=[];
+  for(const op of all||[]){if(String(op.kind||'').startsWith('__')){special.push(op);continue}const ek=entityQueueKey(op.kind,op.id),prev=latest.get(ek);if(!prev||Number(op.createdAt||0)>=Number(prev.createdAt||0))latest.set(ek,{...op,entityKey:ek})}
+  const tx2=db.transaction('outbox','readwrite'),store=tx2.objectStore('outbox');store.clear();for(const op of special)store.put(op);for(const op of latest.values())store.put(op);await txDone(tx2);await setMeta('outboxEconomyV14',true);
+}
+
 async function putEntity(kind,id,payload,{parentId='',sortTs=0,deleted=false,queue=true}={}){
-  if(!session?.company?.id)return;
-  const db=await openDb(),tx=db.transaction(['items','outbox'],'readwrite');
-  const item={pk:pk(kind,id),kind,id:String(id),parentId:String(parentId||''),sortTs:Number(sortTs||0),payload:payload||{},deleted:!!deleted,serverUpdatedAt:0};
-  tx.objectStore('items').put(item);
-  if(queue){
-    const opId=newOpId();
-    tx.objectStore('outbox').put({opId,kind,id:String(id),parentId:item.parentId,sortTs:item.sortTs,payload:cloudPayload(item.payload),deleted:item.deleted,createdAt:Date.now()});
-  }
-  await txDone(tx);updateSyncUI();scheduleAutoSync();
+  if(!session?.company?.id)return false;
+  const existing=await getItem(kind,id).catch(()=>null),nextParent=String(parentId||''),nextSort=Number(sortTs||0),nextDeleted=!!deleted;
+  const same=!!existing&&String(existing.parentId||'')===nextParent&&Number(existing.sortTs||0)===nextSort&&!!existing.deleted===nextDeleted&&payloadEquivalent(existing.payload,payload||{});
+  if(same)return false; // no local change -> no cloud write
+  const db=await openDb(),tx=db.transaction('items','readwrite');
+  const item={pk:pk(kind,id),kind,id:String(id),parentId:nextParent,sortTs:nextSort,payload:payload||{},deleted:nextDeleted,serverUpdatedAt:0};
+  tx.objectStore('items').put(item);await txDone(tx);
+  if(queue){const opId=newOpId();await queueLatestEntityOp({opId,kind,id:String(id),parentId:item.parentId,sortTs:item.sortTs,payload:cloudPayload(item.payload),deleted:item.deleted,createdAt:Date.now()})}
+  if(kind==='archive_record'||kind==='debt_archive_record'){lazyRemoteCache.clear();debtArchiveSummaryCache.clear()}
+  updateSyncUI();scheduleAutoSync();return true;
 }
 async function deleteEntity(kind,id,{parentId='',sortTs=0}={}){
   return putEntity(kind,id,{}, {parentId,sortTs,deleted:true,queue:true});
@@ -147,8 +185,9 @@ async function cancelPendingImageUploads(targetKind,targetId){
 }
 async function queueImageDelete(url){
   url=String(url||'').trim();if(!url||url.startsWith('data:')||url.startsWith('blob:'))return false;
-  const db=await openDb(),tx=db.transaction('outbox','readwrite'),store=tx.objectStore('outbox'),opId=`imgdel-${newOpId()}`;
-  store.put({opId,kind:'__image_delete__',createdAt:Date.now(),payload:{url}});await txDone(tx);updateSyncUI();scheduleAutoSync(250);return true;
+  const db=await openDb(),tx=db.transaction('outbox','readwrite'),store=tx.objectStore('outbox');let exists=false;
+  await new Promise((resolve,reject)=>{const req=store.openCursor();req.onerror=()=>reject(req.error);req.onsuccess=()=>{const c=req.result;if(!c){resolve();return}const v=c.value;if(v.kind==='__image_delete__'&&String(v.payload?.url||'')===url)exists=true;c.continue()}});
+  if(!exists)store.put({opId:`imgdel-${newOpId()}`,kind:'__image_delete__',createdAt:Date.now(),payload:{url}});await txDone(tx);if(!exists){updateSyncUI();scheduleAutoSync(250)}return !exists;
 }
 async function deleteImageAsset(payload,targetKind,targetId){
   const p=payload||{};await cancelPendingImageUploads(targetKind,targetId).catch(()=>{});
@@ -231,10 +270,9 @@ function handleInvalidSession(reason){
 }
 async function validateSession(force=false){
   if(!session)return false;
-  const exp=Number(session.company?.expiresAt||0);
-  if(exp&&Date.now()>=exp){handleInvalidSession('انتهت مدة مفتاح الشركة');return false}
+  // انتهاء الاشتراك لا ينهي الجلسة: القراءة والتصفح يبقيان متاحين.
   if(!navigator.onLine)return true;
-  if(!force && Date.now()-lastValidateAt<10*60*1000)return true;
+  if(!force && Date.now()-lastValidateAt<SESSION_VALIDATE_MS)return true;
   try{
     const d=await api('/auth/validate');
     session.company=d.company;session.lastValidatedAt=Date.now();writeSession(session);lastValidateAt=Date.now();return true;
@@ -304,21 +342,23 @@ async function pushOutbox(){
 async function pullRemote(manual=false){
   const cur=await getMeta('pullCursor',{t:0,rowid:0});
   let cursor={t:Number(cur?.t||0),rowid:Number(cur?.rowid||0)};
-  let pages=0,changed=0;
+  let pages=0,changed=0,received=0,caughtUp=false;
   do{
     const q=`?t=${encodeURIComponent(cursor.t)}&rowid=${encodeURIComponent(cursor.rowid)}&limit=${manual?500:250}`;
     const d=await api('/sync/pull'+q,{timeout:25000});
-    for(const it of d.items||[]){await mergeRemoteItem(it);changed++}
-    cursor=d.cursor||cursor;await setMeta('pullCursor',cursor);pages++;
+    for(const it of d.items||[]){received++;if(await mergeRemoteItem(it))changed++}
+    cursor=d.cursor||cursor;await setMeta('pullCursor',cursor);pages++;caughtUp=!d.hasMore;
     if(!d.hasMore||pages>=(manual?12:2))break;
   }while(true);
-  if(changed)refreshVisibleUI();
-  return changed;
+  await setMeta('lastRemotePullAt',Date.now());
+  if(changed){saveData();refreshVisibleUI()}
+  return{changed,received,caughtUp,cursor};
 }
 async function mergeRemoteItem(it){
+  const old=await getItem(it.kind,it.id).catch(()=>null),same=!!old&&String(old.parentId||'')===String(it.parentId||'')&&Number(old.sortTs||0)===Number(it.sortTs||0)&&!!old.deleted===!!it.deleted&&payloadEquivalent(old.payload,it.payload||{});
   await putItemOnly(it.kind,it.id,it.payload,{parentId:it.parentId,sortTs:it.sortTs,deleted:it.deleted,serverUpdatedAt:it.serverUpdatedAt});
-  applyingRemote=true;
-  try{applyRemoteToLegacy(it)}finally{applyingRemote=false}
+  if(same)return false;
+  applyingRemote=true;try{applyRemoteToLegacy(it)}finally{applyingRemote=false}return true;
 }
 function applyRemoteToLegacy(it){
   const id=String(it.id),p=it.payload||{};
@@ -328,11 +368,12 @@ function applyRemoteToLegacy(it){
   else if(it.kind==='archive_session')upsert(cashArchives);
   else if(it.kind==='category')upsert(categories);
   else if(it.kind==='reminder')upsert(reminders);
+  else if(it.kind==='ledger_record'&&typeof ledgerRecords!=='undefined')upsert(ledgerRecords);
   else if(it.kind==='contact'){
     if(it.deleted)delete contacts[id]; else contacts[id]=p;
   }else if(it.kind==='profile'&&!it.deleted){profile={...profile,...p}}
-  if(['debt_record','cash_record','archive_session','category','reminder','contact','profile'].includes(it.kind))saveData();
 }
+
 function refreshVisibleUI(){
   try{renderDebtsList?.();renderCashList?.();renderProfileUI?.();if(currentDetailName)renderPersonDetailList?.();if(document.getElementById('archiveModal')?.classList.contains('show'))renderArchiveSessions?.()}catch(e){console.warn(e)}
 }
@@ -343,14 +384,19 @@ async function syncNow(manual=false){
   syncLock=true;setSyncVisual('syncing');
   try{
     if(!(await validateSession(manual)))return false;
-    await processImageDeletes(manual?16:5);
-    await processImageUploads(manual?8:3);
-    await processImageDeletes(manual?16:5);
-    let loops=0;
-    do{const n=await pushOutbox();loops++;if(!n||loops>=(manual?12:2))break}while(true);
-    await pullRemote(manual);
+    const lastPull=Number(await getMeta('lastRemotePullAt',0)||0),remoteDue=manual||forceNextRemotePull||!lastPull||(Date.now()-lastPull>=AUTO_REMOTE_PULL_MS);
+    // Pull only when due/manual. Local edits still PUSH immediately, so normal
+    // usage no longer pays for a Turso read after every single transaction.
+    if(remoteDue){await pullRemote(manual);forceNextRemotePull=false}
+    if(!isSubscriptionExpired()){
+      await processImageDeletes(manual?16:5);
+      await processImageUploads(manual?8:3);
+      await processImageDeletes(manual?16:5);
+      let loops=0;
+      do{const n=await pushOutbox();loops++;if(!n||loops>=(manual?12:2))break}while(true);
+    }
     await setMeta('lastSuccessfulSync',Date.now());lastSyncError='';updateSyncUI();
-    if(manual)toast('تمت المزامنة بنجاح');return true;
+    if(manual)toast(isSubscriptionExpired()?'تم تحديث بيانات العرض — اشتراكك انتهى':'تمت المزامنة بنجاح',isSubscriptionExpired()?'info':'success');return true;
   }catch(e){lastSyncError=e.message||'فشلت المزامنة';console.warn('sync',e);updateSyncUI();if(manual)toast(lastSyncError,'error');return false}
   finally{syncLock=false;setSyncVisual('idle')}
 }
@@ -361,7 +407,7 @@ async function updateSyncUI(){
   const badge=document.getElementById('sync-queue-badge');
   if(badge){badge.textContent=count>999?'999+':String(count);badge.classList.toggle('hidden',!count)}
   const status=document.getElementById('sync-status-text');
-  if(status)status.textContent=navigator.onLine?(lastSyncError?'خطأ مزامنة':'متصل'):'دون اتصال';
+  if(status)status.textContent=isSubscriptionExpired()?'عرض فقط':(navigator.onLine?(lastSyncError?'خطأ مزامنة':'متصل'):'دون اتصال');
   const queue=document.getElementById('settings-sync-queue');if(queue)queue.textContent=String(count);
   const online=document.getElementById('settings-online-state');if(online)online.textContent=navigator.onLine?'أونلاين':'أوفلاين';
   const err=document.getElementById('settings-sync-error');if(err)err.textContent=lastSyncError||'—';
@@ -385,14 +431,16 @@ async function rebindPendingImage(recordId,sessionId){
   await new Promise((resolve,reject)=>{const req=s.openCursor();req.onerror=()=>reject(req.error);req.onsuccess=()=>{const c=req.result;if(!c){resolve();return}const x=c.value;if(x.kind==='__image_upload__'&&String(x.payload?.targetKind)==='cash_record'&&String(x.payload?.targetId)===String(recordId)){x.payload.targetKind='archive_record';x.payload.parentId=String(sessionId);c.update(x)}c.continue()}});
   await txDone(tx)
 }
+function lazyCacheFresh(key){const t=Number(lazyRemoteCache.get(key)||0);return t&&Date.now()-t<LAZY_REMOTE_CACHE_MS}
+function markLazyCache(key){lazyRemoteCache.set(key,Date.now());if(lazyRemoteCache.size>200){const first=lazyRemoteCache.keys().next().value;if(first)lazyRemoteCache.delete(first)}}
 async function archivePage(sessionId,beforeTs=Number.MAX_SAFE_INTEGER,beforeId='\uffff',limit=50){
-  let local=await readArchiveLocal(sessionId,beforeTs,beforeId,limit);
-  if(navigator.onLine&&session?.token){
+  let local=await readArchiveLocal(sessionId,beforeTs,beforeId,limit),cacheKey=`cash:${sessionId}:${beforeTs}:${beforeId}:${limit}`;
+  if(navigator.onLine&&session?.token&&!(local.length>=limit&&lazyCacheFresh(cacheKey))){
     try{
       const q=`?kind=archive_record&parentId=${encodeURIComponent(sessionId)}&beforeTs=${encodeURIComponent(beforeTs)}&beforeId=${encodeURIComponent(beforeId)}&limit=${limit}`;
       const d=await api('/items/list'+q,{timeout:22000});
       for(const it of d.items||[]){const pending=await getItem(it.kind,it.id);if(pending&&Number(pending.serverUpdatedAt||0)===0)continue;await putItemOnly(it.kind,it.id,it.payload,{parentId:it.parentId,sortTs:it.sortTs,deleted:it.deleted,serverUpdatedAt:it.serverUpdatedAt})}
-      local=await readArchiveLocal(sessionId,beforeTs,beforeId,limit);
+      markLazyCache(cacheKey);local=await readArchiveLocal(sessionId,beforeTs,beforeId,limit);
     }catch(e){console.warn('lazy archive',e)}
   }
   return local;
@@ -431,9 +479,9 @@ async function readKindParentLocal(kind,parentId,beforeTs=Number.MAX_SAFE_INTEGE
   return new Promise((resolve,reject)=>{const req=idx.openCursor(range,'prev');req.onerror=()=>reject(req.error);req.onsuccess=()=>{const c=req.result;if(!c||out.length>=limit){resolve(out);return}const v=c.value;if(!v.deleted)out.push(v.payload);c.continue()}})
 }
 async function listDebtArchive(parentId,beforeTs=Number.MAX_SAFE_INTEGER,beforeId='\uffff',limit=50){
-  let local=await readKindParentLocal('debt_archive_record',parentId,beforeTs,beforeId,limit);
-  if(navigator.onLine){
-    try{const q=`?kind=debt_archive_record&parentId=${encodeURIComponent(parentId)}&beforeTs=${encodeURIComponent(beforeTs)}&beforeId=${encodeURIComponent(beforeId)}&limit=${limit}`;const d=await api('/items/list'+q,{timeout:22000});for(const it of d.items||[]){const pending=await getItem(it.kind,it.id);if(pending&&Number(pending.serverUpdatedAt||0)===0)continue;await putItemOnly(it.kind,it.id,it.payload,{parentId:it.parentId,sortTs:it.sortTs,deleted:it.deleted,serverUpdatedAt:it.serverUpdatedAt})}local=await readKindParentLocal('debt_archive_record',parentId,beforeTs,beforeId,limit)}catch(e){console.warn('debt archive lazy',e)}
+  let local=await readKindParentLocal('debt_archive_record',parentId,beforeTs,beforeId,limit),cacheKey=`debt:${parentId}:${beforeTs}:${beforeId}:${limit}`;
+  if(navigator.onLine&&!(local.length>=limit&&lazyCacheFresh(cacheKey))){
+    try{const q=`?kind=debt_archive_record&parentId=${encodeURIComponent(parentId)}&beforeTs=${encodeURIComponent(beforeTs)}&beforeId=${encodeURIComponent(beforeId)}&limit=${limit}`;const d=await api('/items/list'+q,{timeout:22000});for(const it of d.items||[]){const pending=await getItem(it.kind,it.id);if(pending&&Number(pending.serverUpdatedAt||0)===0)continue;await putItemOnly(it.kind,it.id,it.payload,{parentId:it.parentId,sortTs:it.sortTs,deleted:it.deleted,serverUpdatedAt:it.serverUpdatedAt})}markLazyCache(cacheKey);local=await readKindParentLocal('debt_archive_record',parentId,beforeTs,beforeId,limit)}catch(e){console.warn('debt archive lazy',e)}
   }
   return local;
 }
@@ -443,7 +491,8 @@ async function retargetPendingImage(recordId,fromKind,toKind,parentId=''){
   await new Promise((resolve,reject)=>{const req=store.openCursor();req.onerror=()=>reject(req.error);req.onsuccess=()=>{const c=req.result;if(!c){resolve();return}const x=c.value;if(x.kind==='__image_upload__'&&String(x.payload?.targetKind)===String(fromKind)&&String(x.payload?.targetId)===String(recordId)){x.payload.targetKind=String(toKind);x.payload.parentId=String(parentId||'');c.update(x);found=true}c.continue()}});await txDone(tx);return found;
 }
 async function debtArchiveSummary(parentId){
-  if(navigator.onLine&&session?.token){try{return await api('/items/debt-archive-summary?parentId='+encodeURIComponent(parentId),{timeout:18000})}catch(e){console.warn('debt archive summary',e)}}
+  const ck=String(parentId||''),cached=debtArchiveSummaryCache.get(ck);if(cached&&Date.now()-cached.at<LAZY_REMOTE_CACHE_MS)return cached.value;
+  if(navigator.onLine&&session?.token){try{const value=await api('/items/debt-archive-summary?parentId='+encodeURIComponent(parentId),{timeout:18000});debtArchiveSummaryCache.set(ck,{at:Date.now(),value});return value}catch(e){console.warn('debt archive summary',e)}}
   const rows=await readKindParentLocal('debt_archive_record',parentId,Number.MAX_SAFE_INTEGER,'\uffff',500);let totalCredit=0,totalDebit=0;rows.forEach(r=>{totalCredit+=Number(r.credit||0);totalDebit+=Number(r.debit||0)});return{ok:true,totalCredit,totalDebit,balance:totalCredit-totalDebit,count:rows.length,partial:rows.length>=500};
 }
 async function archiveDebtRecords(parentId,rows){
@@ -495,7 +544,7 @@ async function openDebtArchivedTransaction(id){
 function renderDebtArchivedTransaction(r){
   const out=Number(r.debit)>0,amt=Number(out?r.debit:r.credit)||0;
   document.getElementById('trans-name').innerText=r.name||currentDetailName||'معاملة مؤرشفة';document.getElementById('trans-time').innerText=`${todayLabel(r.timestamp)} ساعة ${shortTime(r.timestamp)}`;
-  document.getElementById('trans-type-text').innerText=out?'أخذت':'أعطيت';document.getElementById('trans-amount').innerText=`₪ ${fmtMoney(amt)}`;document.getElementById('trans-amount').className=`text-5xl font-extrabold mb-2 ${out?'text-danger':'text-success'}`;
+  document.getElementById('trans-type-text').innerText=out?'أخذت':'أعطيت';document.getElementById('trans-amount').innerText=`₪ ${fmtMoney(amt)}`;document.getElementById('trans-amount').className=`text-5xl font-extrabold mb-2 ${out?'text-success':'text-danger'}`;
   const b=document.getElementById('trans-balance');b.innerText='معاملة محفوظة في الأرشيف';b.className='text-sm font-bold mb-4 px-2 rounded bg-blue-50 text-brand';
   const nw=document.getElementById('trans-note-wrap');if(r.note){document.getElementById('trans-note').innerText=r.note;nw.classList.remove('hidden')}else nw.classList.add('hidden');
   renderTransactionProfile?.();showTransactionImage(r);const m=document.getElementById('singleTransactionModal');m.classList.remove('hidden');m.classList.add('flex');window.updateTransactionArchiveActions?.();
@@ -639,7 +688,7 @@ window.editSingleTransaction=async function(){
 };
 const legacyDeleteSingle=deleteSingleTransaction;
 window.deleteSingleTransaction=async function(){
-  if(currentTransSource==='debtArchive'){const c=await Swal.fire({title:'حذف المعاملة المؤرشفة؟',text:'سيتم حذفها نهائياً من الأرشيف.',icon:'warning',showCancelButton:true,confirmButtonText:'حذف',confirmButtonColor:'#ef4444',cancelButtonText:'إلغاء'});if(!c.isConfirmed)return;await deleteDebtArchivedTransaction();closeSingleTransaction();window.refreshPersonArchiveAfterMutation?.();toast('تم حذف المعاملة');return}
+  if(currentTransSource==='debtArchive'){const before=currentArchivedDebtRecord?{...currentArchivedDebtRecord}:null;const c=await Swal.fire({title:'حذف المعاملة المؤرشفة؟',text:'سيتم حذفها نهائياً من الأرشيف ومن كاش توب إذا كانت حركة مرتبطة.',icon:'warning',showCancelButton:true,confirmButtonText:'حذف',confirmButtonColor:'#ef4444',cancelButtonText:'إلغاء'});if(!c.isConfirmed)return;await deleteDebtArchivedTransaction();if(before)await window.CashTopLink?.handleLocalDelete?.(before).catch(e=>console.warn('linked delete',e));closeSingleTransaction();window.refreshPersonArchiveAfterMutation?.();toast('تم حذف المعاملة');return}
   if(currentTransSource!=='archive'){
     const source=currentTransSource,id=currentTransId;
     const before=source==='cash'?cashRecords.find(x=>String(x.id)===String(id)):records.find(x=>String(x.id)===String(id));
@@ -648,11 +697,12 @@ window.deleteSingleTransaction=async function(){
     if(before&&!still){
       if(source==='cash')await deleteEntityAndImage('cash_record',id,{sortTs:before.timestamp||0},before);
       else await deleteEntityAndImage('debt_record',id,{parentId:personKey(before.name,before.type),sortTs:before.timestamp||0},before);
+      await window.CashTopLink?.handleLocalDelete?.(before).catch(e=>console.warn('linked delete',e));
     }
     return;
   }
-  const r=currentArchivedRecord;if(!r)return;const c=await Swal.fire({title:'حذف المعاملة المؤرشفة؟',text:'سيتم حذفها من هذه الشركة عند المزامنة.',icon:'warning',showCancelButton:true,confirmButtonText:'حذف',confirmButtonColor:'#ef4444',cancelButtonText:'إلغاء'});if(!c.isConfirmed)return;
-  await deleteEntityAndImage('archive_record',r.id,{parentId:String(currentArchiveSessionId),sortTs:r.timestamp},r);await adjustArchiveSessionSummary(currentArchiveSessionId,r,null);closeSingleTransaction();await resetArchiveDetails();toast('تم حذف المعاملة')
+  const r=currentArchivedRecord;if(!r)return;const before={...r};const c=await Swal.fire({title:'حذف المعاملة المؤرشفة؟',text:'سيتم حذفها من هذه الشركة ومن كاش توب إذا كانت حركة مرتبطة.',icon:'warning',showCancelButton:true,confirmButtonText:'حذف',confirmButtonColor:'#ef4444',cancelButtonText:'إلغاء'});if(!c.isConfirmed)return;
+  await deleteEntityAndImage('archive_record',r.id,{parentId:String(currentArchiveSessionId),sortTs:r.timestamp},r);await adjustArchiveSessionSummary(currentArchiveSessionId,r,null);await window.CashTopLink?.handleLocalDelete?.(before).catch(e=>console.warn('linked delete',e));closeSingleTransaction();await resetArchiveDetails();toast('تم حذف المعاملة')
 };
 
 async function restoreCashArchivedTransaction(){
@@ -688,32 +738,31 @@ async function recomputeArchiveSession(sessionId){
 }
 
 // ---------------- Image compression <= 50 KiB ----------------
-// R100 strategy: crop to a square, max 500x500, then reduce JPEG quality/dimensions
-// until the file is genuinely <= 50 KiB. The compressed blob is saved locally first.
+// v16: نحافظ على الصورة كاملة ونسبة أبعادها. لا يوجد قص مربع إطلاقاً.
+// نخفض جودة الترميز أولاً، وإذا كانت الصورة ضخمة جداً نخفض الدقة تناسبياً فقط كحل أخير للوصول إلى 50KB.
 async function compressImageUnder50KB(file,maxKB=50){
   if(!(file instanceof Blob))throw new Error('ملف الصورة غير صالح');
-  const bitmap=await createBitmap(file);
-  const width=Number(bitmap.width||bitmap.naturalWidth||0),height=Number(bitmap.height||bitmap.naturalHeight||0);
-  if(!width||!height){bitmap.close?.();throw new Error('أبعاد الصورة غير صالحة')}
-  const sourceSize=Math.min(width,height),sourceX=Math.max(0,(width-sourceSize)/2),sourceY=Math.max(0,(height-sourceSize)/2);
   const limitBytes=Math.max(8,Number(maxKB||50))*1024;
-  let target=Math.min(sourceSize,500),best=null;
+  if(file.size<=limitBytes&&/^image\/(jpeg|jpg|webp)$/i.test(file.type||''))return file;
+  const bitmap=await createBitmap(file),width=Number(bitmap.width||bitmap.naturalWidth||0),height=Number(bitmap.height||bitmap.naturalHeight||0);
+  if(!width||!height){bitmap.close?.();throw new Error('أبعاد الصورة غير صالحة')}
+  let scale=1,best=null;
   try{
-    while(target>=64){
-      const c=document.createElement('canvas');c.width=Math.max(1,Math.round(target));c.height=c.width;
-      const x=c.getContext('2d',{alpha:false});if(!x)throw new Error('Canvas غير متاح');
-      x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(bitmap,sourceX,sourceY,sourceSize,sourceSize,0,0,c.width,c.height);
-      for(let q=.88;q>=.06;q-=.06){
-        const blob=await canvasBlob(c,'image/jpeg',Math.max(.1,q));
-        if(!best||blob.size<best.size)best=blob;
-        if(blob.size<=limitBytes)return blob;
+    while(scale>=.16){
+      const w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale)),c=document.createElement('canvas');c.width=w;c.height=h;
+      const x=c.getContext('2d',{alpha:false});if(!x)throw new Error('Canvas غير متاح');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(bitmap,0,0,width,height,0,0,w,h);
+      for(const type of ['image/webp','image/jpeg']){
+        for(let q=.9;q>=.02;q-=.04){
+          const blob=await canvasBlob(c,type,Math.max(.01,q));if(!best||blob.size<best.size)best=blob;if(blob.size<=limitBytes)return blob;
+        }
       }
-      target=Math.floor(target*.78);
+      scale*=.86;
     }
     if(best&&best.size<=limitBytes)return best;
     throw new Error('تعذر ضغط الصورة إلى 50KB أو أقل');
   }finally{try{bitmap.close?.()}catch{}}
 }
+
 function canvasBlob(c,type,q){return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error('تعذر ضغط الصورة')),type,q))}
 async function createBitmap(file){
   if(typeof createImageBitmap==='function'){
@@ -826,8 +875,8 @@ async function getAllKindPayloads(kind){
 function mergeById(target,incoming){const map=new Map(target.map(x=>[String(x.id),x]));for(const x of incoming||[])if(x&&x.id!==undefined)map.set(String(x.id),x);target.splice(0,target.length,...map.values());}
 async function hydrateLegacyFromIndexedDB(){
   try{
-    const [debt,cash,archives,cats,rems,contactRows,profiles]=await Promise.all(['debt_record','cash_record','archive_session','category','reminder','contact','profile'].map(getAllKindPayloads));
-    mergeById(records,debt);mergeById(cashRecords,cash);mergeById(cashArchives,archives);mergeById(categories,cats);mergeById(reminders,rems);
+    const [debt,cash,archives,cats,rems,ledger,contactRows,profiles]=await Promise.all(['debt_record','cash_record','archive_session','category','reminder','ledger_record','contact','profile'].map(getAllKindPayloads));
+    mergeById(records,debt);mergeById(cashRecords,cash);mergeById(cashArchives,archives);mergeById(categories,cats);mergeById(reminders,rems);if(typeof ledgerRecords!=='undefined')mergeById(ledgerRecords,ledger);
     for(const c of contactRows||[]){const k=c?.__contactKey||c?.key;if(k)contacts[k]=c}
     // contact payloads from older versions don't contain their key; read the store directly for those.
     const db=await openDb(),tx=db.transaction('items','readonly'),store=tx.objectStore('items');
@@ -865,12 +914,12 @@ async function buildBackup(){
   const parents=new Set([...Object.keys(contacts),...records.map(r=>personKey(r.name,r.type))]);
   for(const parentId of parents){let beforeTs=Number.MAX_SAFE_INTEGER,beforeId='\uffff',guard=0;while(guard++<100000){const page=await listDebtArchive(parentId,beforeTs,beforeId,120);if(!page.length)break;for(const r of page)debtArchiveMap.set(String(r.id),r);const last=page[page.length-1];beforeTs=Number(last.timestamp||0);beforeId=String(last.id);if(page.length<120)break}}
   const debtArchiveRecords=[...debtArchiveMap.values()];
-  return {backupVersion:'cashtop-cloud-v8',exportedAt:new Date().toISOString(),company:{id:session?.company?.id||'',name:session?.company?.name||''},data:{records:[...records],cashRecords:[...cashRecords],cashArchives:[...cashArchives],categories:[...categories],contacts:{...contacts},reminders:[...reminders],profile:{...profile},archiveRecords,debtArchiveRecords}};
+  return {backupVersion:'cashtop-cloud-v8',exportedAt:new Date().toISOString(),company:{id:session?.company?.id||'',name:session?.company?.name||''},data:{records:[...records],cashRecords:[...cashRecords],cashArchives:[...cashArchives],categories:[...categories],contacts:{...contacts},reminders:[...reminders],ledgerRecords:typeof ledgerRecords!=='undefined'?[...ledgerRecords]:[],profile:{...profile},archiveRecords,debtArchiveRecords}};
 }
 async function restoreBackup(doc){
   if(!doc||typeof doc!=='object'||!doc.data)throw new Error('ملف النسخة غير صالح');
-  const d=doc.data;const debt=Array.isArray(d.records)?d.records:[],cash=Array.isArray(d.cashRecords)?d.cashRecords:[],archives=Array.isArray(d.cashArchives)?d.cashArchives:[],cats=Array.isArray(d.categories)?d.categories:[],rems=Array.isArray(d.reminders)?d.reminders:[],ars=Array.isArray(d.archiveRecords)?d.archiveRecords:[],debtArs=Array.isArray(d.debtArchiveRecords)?d.debtArchiveRecords:[];
-  mergeById(records,debt);mergeById(cashRecords,cash);mergeById(cashArchives,archives);mergeById(categories,cats);mergeById(reminders,rems);Object.assign(contacts,d.contacts&&typeof d.contacts==='object'?d.contacts:{});if(d.profile&&typeof d.profile==='object')profile={...profile,...d.profile};saveData();
+  const d=doc.data;const debt=Array.isArray(d.records)?d.records:[],cash=Array.isArray(d.cashRecords)?d.cashRecords:[],archives=Array.isArray(d.cashArchives)?d.cashArchives:[],cats=Array.isArray(d.categories)?d.categories:[],rems=Array.isArray(d.reminders)?d.reminders:[],ledger=Array.isArray(d.ledgerRecords)?d.ledgerRecords:[],ars=Array.isArray(d.archiveRecords)?d.archiveRecords:[],debtArs=Array.isArray(d.debtArchiveRecords)?d.debtArchiveRecords:[];
+  mergeById(records,debt);mergeById(cashRecords,cash);mergeById(cashArchives,archives);mergeById(categories,cats);mergeById(reminders,rems);if(typeof ledgerRecords!=='undefined')mergeById(ledgerRecords,ledger);Object.assign(contacts,d.contacts&&typeof d.contacts==='object'?d.contacts:{});if(d.profile&&typeof d.profile==='object')profile={...profile,...d.profile};saveData();
   let total=0;
   for(const r of debt){await putEntity('debt_record',r.id,r,{parentId:personKey(r.name,r.type),sortTs:r.timestamp||0,queue:true});if(++total%60===0)await new Promise(requestAnimationFrame)}
   for(const r of cash){await putEntity('cash_record',r.id,r,{sortTs:r.timestamp||0,queue:true});if(++total%60===0)await new Promise(requestAnimationFrame)}
@@ -880,6 +929,7 @@ async function restoreBackup(doc){
   for(const c of cats){await putEntity('category',c.id,c,{sortTs:c.id||0,queue:true});total++}
   for(const [k,c] of Object.entries(d.contacts||{})){await putEntity('contact',k,c,{queue:true});total++}
   for(const r of rems){await putEntity('reminder',r.id,r,{parentId:personKey(r.name,r.type),sortTs:r.at||0,queue:true});total++}
+  for(const r of ledger){await putEntity('ledger_record',r.id,r,{sortTs:r.timestamp||0,queue:true});if(++total%60===0)await new Promise(requestAnimationFrame)}
   if(d.profile){await putEntity('profile','main',profile,{sortTs:Date.now(),queue:true});total++}
   refreshVisibleUI();scheduleAutoSync(300);return{ok:true,total};
 }
@@ -901,7 +951,6 @@ function hideLogin(){document.getElementById('loginScreen')?.classList.remove('s
 function bootAuthUI(){
   const reason=localStorage.getItem('cashtop_logout_reason');if(reason){localStorage.removeItem('cashtop_logout_reason');showLoginMessage(reason,'error')}
   if(!session?.token||!session?.company?.id){showLogin();return false}
-  if(Number(session.company.expiresAt||0)&&Date.now()>=Number(session.company.expiresAt)){writeSession(null);showLogin();showLoginMessage('انتهت مدة مفتاح الشركة','error');return false}
   hideLogin();document.getElementById('settings-company-name')?.replaceChildren(document.createTextNode(session.company.name||''));document.getElementById('settings-company-expiry')?.replaceChildren(document.createTextNode(new Date(session.company.expiresAt).toLocaleString('ar-EG')));return true
 }
 
@@ -935,7 +984,7 @@ function wrapLegacyMutations(){
 
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;updateInstallButton()});
 window.addEventListener('appinstalled',()=>{installPrompt=null;updateInstallButton();toast('تم تثبيت التطبيق')});
-window.addEventListener('online',()=>{updateSyncUI();validateSession(true);scheduleAutoSync(300)});
+window.addEventListener('online',()=>{forceNextRemotePull=true;updateSyncUI();validateSession(true);scheduleAutoSync(300)});
 window.addEventListener('offline',updateSyncUI);
 window.addEventListener('pagehide',()=>{for(const u of localObjectUrls)URL.revokeObjectURL(u);localObjectUrls.clear()});
 
@@ -945,8 +994,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   window.loginCompany=()=>login();window.logoutCompany=()=>logout();window.manualSync=()=>syncNow(true);window.installCashTop=()=>chooseInstall();
   const k=document.getElementById('login-company-key');if(k)k.addEventListener('keydown',e=>{if(e.key==='Enter')login()});
   if(!bootAuthUI())return;
-  wrapLegacyMutations();await requestPersistentStorage();await hydrateLegacyFromIndexedDB();await migrateCategoryScopesV10();await migrateLegacy();await updateSyncUI();updateInstallButton();renderArchiveSessions();validateSession(false);scheduleAutoSync(500);
-  setInterval(()=>{if(session){validateSession(false);if(navigator.onLine)scheduleAutoSync(100)}},5*60*1000);
+  if(isSubscriptionExpired())setTimeout(()=>toast('اشتراكك انتهى','error'),250);
+  wrapLegacyMutations();await requestPersistentStorage();await migrateOutboxEconomyV14();await hydrateLegacyFromIndexedDB();await migrateCategoryScopesV10();await migrateLegacy();await updateSyncUI();updateInstallButton();renderArchiveSessions();validateSession(false);scheduleAutoSync(500);
+  setInterval(()=>{if(session){validateSession(false);if(navigator.onLine)scheduleAutoSync(100)}},60*1000);
 });
 
 })();

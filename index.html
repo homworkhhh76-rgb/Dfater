@@ -16,13 +16,13 @@
 .logo{width:112px;height:112px;border-radius:30px;margin:0 auto 22px;display:grid;place-items:center;background:linear-gradient(145deg,#2497ee,#238be1);box-shadow:0 18px 38px rgba(30,136,229,.25)}.logo img{width:100%;height:100%;object-fit:cover;border-radius:30px;display:block}
 h1{text-align:center;font-size:37px;margin:0 0 4px;font-weight:900}.sub{text-align:center;color:#93a4ba;font-weight:800;font-size:19px;margin:0 0 34px}
 label{display:block;color:#1689df;font-weight:900;font-size:21px;margin:0 0 10px}.input{width:100%;border:1.5px solid #d9e4ed;border-radius:20px;padding:18px 20px;font-size:22px;font-weight:800;outline:none;background:#fff;color:#17233a;direction:ltr;text-align:left}.input:focus{border-color:#1e88e5;box-shadow:0 0 0 4px #1e88e514}
-button{width:100%;border:0;border-radius:19px;padding:18px;font-size:22px;font-weight:900;cursor:pointer}.primary{margin-top:18px;background:#248fdf;color:#fff;box-shadow:0 12px 25px rgba(30,136,229,.20)}button:disabled{opacity:.6;cursor:wait}.msg{display:none;margin-top:15px;padding:14px 16px;border-radius:16px;text-align:center;font-weight:800;line-height:1.6}.msg.show{display:block}.msg.error{background:#fff0f0;color:#b91c1c}.msg.ok{background:#ecfdf3;color:#15803d}.msg.info{background:#eff8ff;color:#176da6}
+button{width:100%;border:0;border-radius:19px;padding:18px;font-size:22px;font-weight:900;cursor:pointer;font-family:Cairo,Tahoma,Arial,sans-serif}.primary{margin-top:18px;background:#248fdf;color:#fff;box-shadow:0 12px 25px rgba(30,136,229,.20)}button:disabled{opacity:.6;cursor:wait}.msg{display:none;margin-top:15px;padding:14px 16px;border-radius:16px;text-align:center;font-weight:800;line-height:1.6}.msg.show{display:block}.msg.error{background:#fff0f0;color:#b91c1c}.msg.ok{background:#ecfdf3;color:#15803d}.msg.info{background:#eff8ff;color:#176da6}
 
 .status{position:fixed;top:12px;left:12px;display:flex;align-items:center;gap:7px;background:#ffffffdb;border:1px solid #e2e8f0;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;color:#64748b;backdrop-filter:blur(10px)}.dot{width:8px;height:8px;border-radius:50%;background:#22c55e}.off .dot{background:#ef4444}
 @media(max-width:480px){body{padding:18px}.card{padding:30px 22px 24px;border-radius:28px}.logo{width:98px;height:98px}.logo img{width:100%;height:100%}h1{font-size:32px}.sub{font-size:17px}.input{font-size:19px}button{font-size:20px}}
 </style>
 <script>
-(function(){try{const pub=new URLSearchParams(location.search).get('c');if(pub){location.replace('./c.html#'+encodeURIComponent(pub));return}const s=JSON.parse(localStorage.getItem('cashtop_cloud_session_v3')||'null');if(s?.token&&s?.company?.id&&(!Number(s.company.expiresAt||0)||Date.now()<Number(s.company.expiresAt))){location.replace('./app.html')}}catch(_){}})();
+(function(){try{const pub=new URLSearchParams(location.search).get('c');if(pub){location.replace('./c.html#'+encodeURIComponent(pub));return}const s=JSON.parse(localStorage.getItem('cashtop_cloud_session_v3')||'null');if(s?.token&&s?.company?.id){location.replace('./app.html')}}catch(_){}})();
 </script>
 </head>
 <body>
@@ -32,7 +32,7 @@ button{width:100%;border:0;border-radius:19px;padding:18px;font-size:22px;font-w
   <h1>دفتر كاش توب</h1><p class="sub">تسجيل دخول الشركة</p>
   <label for="companyKey">مفتاح الشركة</label>
   <input id="companyKey" class="input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CT-XXXX-XXXX">
-  <button id="loginBtn" class="primary">دخول الشركة</button>
+  <button id="loginBtn" class="primary">تسجيل الدخول</button>
   <div id="msg" class="msg"></div>
 </main>
 <script src="./direct-cloud.js"></script>
@@ -41,7 +41,7 @@ button{width:100%;border:0;border-radius:19px;padding:18px;font-size:22px;font-w
 const SESSION_KEY='cashtop_cloud_session_v3',$=id=>document.getElementById(id),msg=$('msg'),btn=$('loginBtn'),key=$('companyKey');
 function show(t,type='info'){msg.textContent=t;msg.className='msg show '+type}
 function net(){const e=$('net');e.classList.toggle('off',!navigator.onLine);e.querySelector('span:last-child').textContent=navigator.onLine?'أونلاين':'أوفلاين'}
-async function login(){const v=key.value.trim();if(!v)return show('أدخل مفتاح الشركة','error');if(!navigator.onLine)return show('أول تسجيل دخول يحتاج إنترنت. بعد ذلك يعمل التطبيق أوفلاين.','error');btn.disabled=true;btn.textContent='جاري الاتصال...';show('جاري تجهيز قاعدة البيانات والتحقق من المفتاح...','info');try{const d=await CashTopDirectAPI.request('/auth/login',{method:'POST',body:{companyKey:v}});localStorage.setItem(SESSION_KEY,JSON.stringify({token:d.token,company:d.company,loginAt:Date.now(),lastValidatedAt:Date.now()}));localStorage.setItem('cashtop_last_company_hint',v.slice(0,5));show('تم تسجيل الدخول','ok');location.replace('./app.html')}catch(e){show(e.message||'تعذر تسجيل الدخول','error')}finally{btn.disabled=false;btn.textContent='دخول الشركة'}}
+async function login(){const v=key.value.trim();if(!v)return show('أدخل مفتاح الشركة','error');if(!navigator.onLine)return show('أول تسجيل دخول يحتاج إنترنت. بعد ذلك يعمل التطبيق أوفلاين.','error');btn.disabled=true;btn.textContent='جاري الاتصال...';show('جاري تجهيز قاعدة البيانات والتحقق من المفتاح...','info');try{const d=await CashTopDirectAPI.request('/auth/login',{method:'POST',body:{companyKey:v}});localStorage.setItem(SESSION_KEY,JSON.stringify({token:d.token,company:d.company,loginAt:Date.now(),lastValidatedAt:Date.now()}));localStorage.setItem('cashtop_last_company_hint',v.slice(0,5));show('تم تسجيل الدخول','ok');location.replace('./app.html')}catch(e){show(e.message||'تعذر تسجيل الدخول','error')}finally{btn.disabled=false;btn.textContent='تسجيل الدخول'}}
 btn.onclick=login;key.addEventListener('keydown',e=>{if(e.key==='Enter')login()});addEventListener('online',net);addEventListener('offline',net);net();
 if('serviceWorker'in navigator&&location.protocol!=='file:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();

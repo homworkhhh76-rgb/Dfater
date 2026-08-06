@@ -1,8 +1,8 @@
 'use strict';
-const VERSION='ct-ready-v11-20260806-1';
+const VERSION='ct-ready-v17-20260806-invoice-payment-split-1';
 const STATIC=VERSION+'-static';
 const RUNTIME=VERSION+'-runtime';
-const SHELL=['./','./index.html','./app.html','./c.html','./admin.html','./app-logo.png','./download-icon.png','./direct-cloud.js','./cashtop-sync.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png'];
+const SHELL=['./','./index.html','./app.html','./c.html','./admin.html','./app-logo.png','./download-icon.png','./direct-cloud.js','./cashtop-sync.js','./cashtop-link.js','./ledger.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png'];
 const REMOTE=[
   'https://cdn.tailwindcss.com/',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
