@@ -16,9 +16,7 @@ const CFG={
   BUNNY_ROOT_FOLDER:'cashtop-images',
   ADMIN_PASSWORD:'admin123',
   SESSION_SECRET:'cashtop-direct-v5-session-2026-08-05-please-change-if-public',
-  LICENSE_PEPPER:'change-this-to-a-second-long-random-secret-please',
-  DEFAULT_COMPANY_KEY:'SUPERADMIN',
-  DEFAULT_COMPANY_NAME:'الشركة الرئيسية'
+  LICENSE_PEPPER:'change-this-to-a-second-long-random-secret-please'
 };
 
 const MAX_PUSH_OPS=150,MAX_PULL=500,MAX_IMAGE_BYTES=50*1024;
@@ -58,9 +56,14 @@ async function ensureSchema(){
       stmt(`CREATE TABLE IF NOT EXISTS ct3_public_customer_links (public_key TEXT PRIMARY KEY,company_id TEXT NOT NULL,person_key TEXT NOT NULL,person_type TEXT NOT NULL,person_name TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(company_id,person_key))`),
       stmt(`CREATE INDEX IF NOT EXISTS ct3_public_customer_company ON ct3_public_customer_links(company_id,person_key,active)`)
     ]);
-    // A ready-to-use first company so the user does not need to install/seed DB.
-    const hash=await licenseHash(CFG.DEFAULT_COMPANY_KEY),now=Date.now(),exp=new Date('2099-12-31T23:59:59Z').getTime();
-    await pipeline([stmt(`INSERT OR IGNORE INTO ct3_companies(id,name,key_hash,key_hint,status,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`,['default-company',CFG.DEFAULT_COMPANY_NAME,hash,'SUPER••••DMIN','active',exp,now,now])]);
+
+    // لا يوجد مفتاح شركة افتراضي. يتم إنشاء المفاتيح من ملف admin.html فقط.
+    // تنظيف المفتاح التجريبي القديم إن كان موجوداً من الإصدارات السابقة.
+    await pipeline([
+      stmt(`DELETE FROM ct3_public_customer_links WHERE company_id='default-company'`),
+      stmt(`DELETE FROM ct3_sync_items WHERE company_id='default-company'`),
+      stmt(`DELETE FROM ct3_companies WHERE id='default-company'`)
+    ]);
     return true;
   })().catch(e=>{schemaPromise=null;throw e});
   return schemaPromise;
@@ -92,7 +95,16 @@ async function request(path,opt={}){
   if(p==='/admin/login'&&method==='POST'){if(String(body.password||'')!==CFG.ADMIN_PASSWORD)throw err(401,'كلمة مرور الأدمن غير صحيحة');const exp=Date.now()+12*3600000;return{ok:true,token:await signToken({type:'admin',exp}),expiresAt:exp}}
   if(p==='/admin/companies'&&method==='GET'){await requireAdmin(token);const[r]=await pipeline([stmt(`SELECT id,name,key_hint,status,expires_at,created_at,updated_at,deleted_at FROM ct3_companies ORDER BY created_at DESC LIMIT 500`)]);return{ok:true,companies:rowsOf(r)}}
   if(p==='/admin/companies'&&method==='POST'){await requireAdmin(token);const name=String(body.name||'').trim();if(!name)throw err(400,'اسم الشركة مطلوب');const plainKey=String(body.companyKey||randomCompanyKey()).trim().toUpperCase(),expiresAt=normalizeExpiry(body.expiresAt,body.durationDays),now=Date.now(),id=crypto.randomUUID(),hash=await licenseHash(plainKey),hint=plainKey.length>8?plainKey.slice(0,5)+'••••'+plainKey.slice(-4):'••••';try{await pipeline([stmt(`INSERT INTO ct3_companies(id,name,key_hash,key_hint,status,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`,[id,name,hash,hint,'active',expiresAt,now,now])])}catch(e){if(/UNIQUE|constraint/i.test(String(e.message)))throw err(409,'مفتاح الشركة مستخدم مسبقاً');throw e}return{ok:true,company:{id,name,companyKey:plainKey,keyHint:hint,status:'active',expiresAt,createdAt:now}}}
-  const m=p.match(/^\/admin\/companies\/([^/]+)$/);if(m&&(method==='PATCH'||method==='DELETE')){await requireAdmin(token);const id=decodeURIComponent(m[1]),now=Date.now();if(method==='DELETE'){const[r]=await pipeline([stmt(`UPDATE ct3_companies SET status='deleted',deleted_at=?,updated_at=? WHERE id=?`,[now,now,id])]);if(!Number(r.affected_row_count||0))throw err(404,'الشركة غير موجودة');companyCache.delete(id);return{ok:true}}const[q]=await pipeline([stmt(`SELECT id,name,status,expires_at FROM ct3_companies WHERE id=? LIMIT 1`,[id])]);const old=rowsOf(q)[0];if(!old)throw err(404,'الشركة غير موجودة');const name=body.name!==undefined?String(body.name).trim():old.name,status=body.status!==undefined?String(body.status):old.status;if(!['active','stopped','deleted'].includes(status))throw err(400,'حالة غير صالحة');let expiresAt=Number(old.expires_at);if(body.expiresAt!==undefined||body.durationDays!==undefined)expiresAt=normalizeExpiry(body.expiresAt,body.durationDays);await pipeline([stmt(`UPDATE ct3_companies SET name=?,status=?,expires_at=?,updated_at=?,deleted_at=? WHERE id=?`,[name,status,expiresAt,now,status==='deleted'?now:null,id])]);companyCache.delete(id);return{ok:true,company:{id,name,status,expiresAt,updatedAt:now}}}
+  const m=p.match(/^\/admin\/companies\/([^/]+)$/);if(m&&(method==='PATCH'||method==='DELETE')){await requireAdmin(token);const id=decodeURIComponent(m[1]),now=Date.now();if(method==='DELETE'){
+    const[q0]=await pipeline([stmt(`SELECT id FROM ct3_companies WHERE id=? LIMIT 1`,[id])]);
+    if(!rowsOf(q0)[0])throw err(404,'الشركة غير موجودة');
+    await pipeline([
+      stmt(`DELETE FROM ct3_public_customer_links WHERE company_id=?`,[id]),
+      stmt(`DELETE FROM ct3_sync_items WHERE company_id=?`,[id]),
+      stmt(`DELETE FROM ct3_companies WHERE id=?`,[id])
+    ]);
+    companyCache.delete(id);return{ok:true,deletedData:true}
+  }const[q]=await pipeline([stmt(`SELECT id,name,status,expires_at FROM ct3_companies WHERE id=? LIMIT 1`,[id])]);const old=rowsOf(q)[0];if(!old)throw err(404,'الشركة غير موجودة');const name=body.name!==undefined?String(body.name).trim():old.name,status=body.status!==undefined?String(body.status):old.status;if(!['active','stopped','deleted'].includes(status))throw err(400,'حالة غير صالحة');let expiresAt=Number(old.expires_at);if(body.expiresAt!==undefined||body.durationDays!==undefined)expiresAt=normalizeExpiry(body.expiresAt,body.durationDays);await pipeline([stmt(`UPDATE ct3_companies SET name=?,status=?,expires_at=?,updated_at=?,deleted_at=? WHERE id=?`,[name,status,expiresAt,now,status==='deleted'?now:null,id])]);companyCache.delete(id);return{ok:true,company:{id,name,status,expiresAt,updatedAt:now}}}
   if(p==='/public-links/customer'&&method==='POST'){
     const c=await requireCompany(token),personKey=String(body.personKey||'').trim().slice(0,200),personType=String(body.type||'customers').trim().slice(0,30),personName=String(body.name||'').trim().slice(0,180),requested=String(body.publicKey||'').trim().slice(0,40),now=Date.now();
     if(!personKey||!personName)throw err(400,'بيانات العميل غير مكتملة');

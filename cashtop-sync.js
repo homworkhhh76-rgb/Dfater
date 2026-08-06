@@ -27,7 +27,7 @@ window.CashTopSync={
   login,logout,syncNow,queueLegacySnapshot,putEntity,deleteEntity,archivePage,
   storeArchiveSession,resolveRecordImage,chooseInstall,requestPersistentStorage,
   showStorageInfo,buildBackup,restoreBackup,hydrateLegacyFromIndexedDB,apiBase:()=>apiBase(),session:()=>session,
-  archiveDebtRecords,listDebtArchive,debtArchiveSummary,openDebtArchivedTransaction,restoreDebtArchivedTransaction,deleteDebtArchivedTransaction,restoreCashArchivedTransaction
+  archiveDebtRecords,listDebtArchive,debtArchiveSummary,openDebtArchivedTransaction,restoreDebtArchivedTransaction,deleteDebtArchivedTransaction,restoreCashArchivedTransaction,moveDebtArchivePerson,restoreDebtArchiveBatch,deleteDebtArchiveBatch
 };
 
 function readSession(){
@@ -408,6 +408,42 @@ async function archiveDebtRecords(parentId,rows){
   return list.length;
 }
 async function getDebtArchiveRecord(id){const it=await getItem('debt_archive_record',id);return it&&!it.deleted?it.payload:null}
+
+async function moveDebtArchivePerson(oldParentId,newParentId,newType,newName){
+  oldParentId=String(oldParentId||'');newParentId=String(newParentId||'');
+  if(!oldParentId||!newParentId||oldParentId===newParentId)return 0;
+  let beforeTs=Number.MAX_SAFE_INTEGER,beforeId='\uffff',moved=0,guard=0;
+  while(guard++<100000){
+    const page=await listDebtArchive(oldParentId,beforeTs,beforeId,100);
+    if(!page.length)break;
+    for(const src of page){
+      const r={...src,type:newType||src.type,name:newName||src.name,archiveParentId:newParentId};
+      await putEntity('debt_archive_record',r.id,r,{parentId:newParentId,sortTs:r.timestamp||0,queue:true});
+      if(r.imageLocalId)await retargetPendingImage(r.id,'debt_archive_record','debt_archive_record',newParentId);
+      moved++;
+    }
+    const last=page[page.length-1];beforeTs=Number(last.timestamp||0);beforeId=String(last.id);
+    if(page.length<100)break;
+  }
+  return moved;
+}
+async function restoreDebtArchiveBatch(parentId,rows){
+  const list=Array.isArray(rows)?rows:[];const restored=[];
+  for(const src of list){
+    const r={...src};delete r.archivedAt;delete r.archiveParentId;
+    await deleteEntity('debt_archive_record',r.id,{parentId:String(parentId||personKey(r.name,r.type)),sortTs:r.timestamp||0});
+    const activeParent=personKey(r.name,r.type);
+    await putEntity('debt_record',r.id,r,{parentId:activeParent,sortTs:r.timestamp||0,queue:true});
+    if(r.imageLocalId){const moved=await retargetPendingImage(r.id,'debt_archive_record','debt_record',activeParent);if(!moved)await enqueueImage(r.imageLocalId,'debt_record',r.id,activeParent,r.timestamp||0)}
+    restored.push(r);
+  }
+  return restored;
+}
+async function deleteDebtArchiveBatch(parentId,rows){
+  const list=Array.isArray(rows)?rows:[];let count=0;
+  for(const r of list){await deleteEntity('debt_archive_record',r.id,{parentId:String(parentId||personKey(r.name,r.type)),sortTs:r.timestamp||0});count++}
+  return count;
+}
 async function openDebtArchivedTransaction(id){
   currentTransId=id;currentTransSource='debtArchive';currentArchivedDebtRecord=await getDebtArchiveRecord(id);if(!currentArchivedDebtRecord){toast('تعذر تحميل المعاملة المؤرشفة','error');return}
   renderDebtArchivedTransaction(currentArchivedDebtRecord);
@@ -431,8 +467,8 @@ window.renderArchiveSessions=function(){
   const list=document.getElementById('archive-session-list');if(!list)return;
   const arr=[...cashArchives].sort((a,b)=>Number(b.closedAt||0)-Number(a.closedAt||0));
   if(!arr.length){list.innerHTML='<div class="text-center py-20 text-gray-400"><div class="archive-empty-icon"><i class="fas fa-box-archive"></i></div><div class="font-extrabold text-lg">لا توجد جلسات مؤرشفة</div><div class="text-sm mt-2">عند إنهاء دفتر النقدية تظهر كل جلسة هنا بشكل مستقل.</div></div>';return}
-  const stamp=(ts)=>{const d=new Date(Number(ts)||Date.now()),pad=n=>String(n).padStart(2,'0');return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${String(d.getFullYear()).slice(-2)}  ${pad(d.getHours())}:${pad(d.getMinutes())}`};
-  list.innerHTML=arr.map(s=>{const tin=Number(s.totalIn||0),tout=Number(s.totalOut||0),bal=Number(s.net??(tin-tout));return `<button type="button" onclick="openArchiveSession('${escapeHTML(String(s.id))}')" class="archive-session-card"><div class="archive-v8-head"><div class="archive-v8-date from"><span class="lbl">من</span><span class="stamp">${stamp(s.openedAt)}</span></div><div class="archive-v8-date to"><span class="lbl">إلى</span><span class="stamp">${stamp(s.closedAt)}</span></div></div><div class="archive-v8-foot"><div class="archive-v8-balance ${bal>=0?'positive':'negative'}"><span class="lbl">الرصيد الصافي</span><strong>₪ ${fmtMoney(Math.abs(bal))}</strong></div><div class="archive-v8-meta"><span class="archive-v8-count">${Number(s.recordCount||0)} معاملة</span><span class="archive-v8-chevron"><i class="fas fa-chevron-left"></i></span></div></div></button>`}).join('');
+  const stamp=(ts)=>{const d=new Date(Number(ts)||Date.now()),pad=n=>String(n).padStart(2,'0');return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${String(d.getFullYear()).slice(-2)} • ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+  list.innerHTML=arr.map(s=>{const tin=Number(s.totalIn||0),tout=Number(s.totalOut||0),bal=Number(s.net??(tin-tout));return `<button type="button" onclick="openArchiveSession('${escapeHTML(String(s.id))}')" class="archive-session-card archive-v9-card"><div class="archive-v9-line"><span class="archive-v9-label">من</span><span class="archive-v9-stamp">${stamp(s.openedAt)}</span></div><div class="archive-v9-line"><span class="archive-v9-label">إلى</span><span class="archive-v9-stamp">${stamp(s.closedAt)}</span></div><div class="archive-v9-bottom"><div class="archive-v9-balance ${bal>=0?'positive':'negative'}"><span>الرصيد الصافي</span><strong>₪ ${fmtMoney(Math.abs(bal))}</strong></div><div class="archive-v9-side"><span>${Number(s.recordCount||0)} معاملة</span><i class="fas fa-chevron-left"></i></div></div></button>`}).join('');
 };
 window.openArchive=function(sessionId=null){
   document.getElementById('archiveModal')?.classList.add('show');renderArchiveSessions();if(sessionId)setTimeout(()=>openArchiveSession(sessionId),30)

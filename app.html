@@ -45,7 +45,7 @@
 </style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cash Top - تطبيق إدارة الحسابات</title>
+    <title>دفتر كاش توب</title>
     <meta name="theme-color" content="#1E88E5">
     <meta name="application-name" content="CashTop">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -92,7 +92,7 @@
         })();
     </script>
     
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -347,6 +347,50 @@
 [dir="ltr"].archive-safe-ltr{unicode-bidi:isolate;text-align:left}
 </style>
 
+
+<style id="ct-v9-style">
+/* v9 — واجهة ناعمة، بحث مثل المرجع، تعديل الحساب، وأرشيف جديد بالكامل */
+.debt-search-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 58px 58px;gap:12px;align-items:center;direction:rtl}
+.debt-search-box{height:58px;border-radius:16px;background:#f1f7fc;display:flex;align-items:center;gap:12px;padding:0 18px;color:#8aa9bf;border:1px solid #edf3f7;box-shadow:0 2px 8px rgba(35,85,125,.025)}
+.debt-search-box i{font-size:21px;flex:0 0 auto}.debt-search-box input{width:100%;height:100%;border:0;outline:0;background:transparent;text-align:right;font:800 17px Cairo,sans-serif;color:#2a4059;min-width:0}.debt-search-box input::placeholder{color:#93adbf}
+.debt-tool-btn{width:58px;height:58px;border:0;border-radius:16px;background:#eaf5fd;color:#2196e6;display:grid;place-items:center;font-size:24px;box-shadow:0 2px 8px rgba(35,85,125,.04);transition:.16s}
+.debt-tool-btn:active{transform:scale(.96);background:#dceffc}
+.person-title-button{border:0;background:transparent;padding:0 14px;cursor:pointer;font-family:inherit}
+#categoryScreen{z-index:110!important}#newCategoryScreen{z-index:120!important}
+#personEditModal{height:var(--app-height,100dvh);max-height:var(--app-height,100dvh);overflow:hidden!important}
+.edit-person-header{height:76px;display:grid;grid-template-columns:40px 1fr 40px;align-items:center;padding:0 22px;border-bottom:1px solid #edf2f6;background:#fff;flex:0 0 auto}
+.edit-person-header h2{margin:0;text-align:center;color:#2196e6;font-size:21px;font-weight:900}.edit-person-back{border:0;background:transparent;color:#2196e6;font-size:27px;height:48px;display:grid;place-items:center}
+.edit-person-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:30px 28px 150px;background:#fff}
+.edit-field{margin-bottom:22px}.edit-field label{display:block;text-align:right;color:#168edc;font-weight:900;font-size:16px;margin-bottom:9px}
+.edit-field input{width:100%;height:86px;border:1.5px solid #cfe3f1;border-radius:13px;padding:0 20px;outline:0;background:#fff;font:700 20px Cairo,sans-serif;color:#1e2f46;text-align:right;transition:.15s}
+.edit-field input:focus{border-color:#2196e6;box-shadow:0 0 0 4px rgba(33,150,230,.08)}
+.edit-phone-wrap{position:relative}.edit-phone-wrap input{direction:ltr;text-align:left;padding-left:82px}.edit-phone-flag{position:absolute;left:14px;top:50%;transform:translateY(-50%);height:52px;min-width:58px;padding:0 10px;border-radius:11px;background:#f3f7fa;border:1px solid #e3ebf1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:28px}.edit-phone-flag.hidden{display:none!important}
+.edit-convert-btn{width:100%;min-height:112px;border:1.5px solid #d4e6f2;border-radius:14px;background:#fff;display:grid;grid-template-columns:52px 1fr 30px;align-items:center;gap:14px;padding:15px 18px;margin:5px 0 22px;color:#243b59;font-family:inherit}
+.edit-convert-btn strong{text-align:right;font-size:19px;font-weight:900}.edit-convert-btn>i{color:#2196e6;font-size:24px}.edit-convert-icon{width:52px;height:52px;border-radius:50%;background:#eaf6ff;color:#2196e6;display:grid;place-items:center;font-size:23px}
+.edit-categories-card{min-height:190px;border:1.5px solid #d4e6f2;border-radius:14px;padding:22px;background:#fff}.edit-categories-head{display:flex;align-items:center;justify-content:space-between;gap:15px;color:#2196e6;font-weight:900;font-size:18px}.edit-categories-head button{border:0;background:#eaf6ff;color:#2196e6;border-radius:999px;padding:10px 14px;font:800 13px Cairo,sans-serif}.edit-category-value{margin-top:28px;display:inline-flex;background:#f3f6f9;color:#8aa2b5;padding:10px 16px;border-radius:9px;font-weight:800}
+.edit-person-footer{position:absolute;bottom:0;left:0;right:0;display:grid;grid-template-columns:1fr 1fr;gap:28px;background:#fff;border-top:1px solid #edf2f6;padding:20px 28px calc(20px + env(safe-area-inset-bottom));z-index:5}.edit-person-footer button{height:86px;border:0;border-radius:8px;font:700 20px Cairo,sans-serif}.edit-save-btn{background:#2196f3;color:#fff}.edit-delete-btn{background:#fdecec;color:#e7656c}
+.person-restore-select{margin-bottom:0}.person-archive-actions{z-index:6}
+.person-archive-row.v9-selectable{grid-template-columns:36px minmax(0,1fr) 100px}.person-archive-row.v9-selectable input{width:24px;height:24px;accent-color:#2196f3}
+.person-archive-row .archive-check-wrap{display:grid;place-items:center}
+
+/* أرشيف النقدية الجديد: سطران للتاريخ بدون أي تداخل */
+#archive-session-list.archive-session-list{display:flex!important;flex-direction:column!important;gap:14px!important;max-width:720px;margin:0 auto;padding:0 0 120px!important;direction:rtl}
+#archive-session-list .archive-session-card.archive-v9-card{all:unset;box-sizing:border-box;width:100%;display:block;cursor:pointer;background:#fff;border:1px solid #e7edf4;border-radius:22px;padding:20px 20px 17px;box-shadow:0 8px 26px rgba(36,79,112,.07);font-family:Cairo,sans-serif;color:#263b54;transition:.16s}
+#archive-session-list .archive-session-card.archive-v9-card:active{transform:scale(.992);background:#fbfdff}
+.archive-v9-line{display:grid;grid-template-columns:54px minmax(0,1fr);align-items:center;gap:10px;min-height:43px;border-bottom:1px solid #f0f4f7}
+.archive-v9-line:nth-child(2){border-bottom:0}.archive-v9-label{text-align:right;font-weight:900;font-size:17px;color:#263a52}.archive-v9-stamp{min-width:0;text-align:left;direction:ltr;unicode-bidi:plaintext;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#7f9eb5;font-weight:800;font-size:15px}
+.archive-v9-bottom{margin-top:13px;padding-top:13px;border-top:1px solid #edf2f6;display:flex;align-items:center;justify-content:space-between;gap:12px}.archive-v9-balance{min-width:0;text-align:right}.archive-v9-balance span{display:block;color:#7893a8;font-size:13px;font-weight:800}.archive-v9-balance strong{display:block;margin-top:2px;font-size:22px;font-weight:900;direction:ltr;unicode-bidi:plaintext}.archive-v9-balance.positive strong{color:#4caf50}.archive-v9-balance.negative strong{color:#f44336}.archive-v9-side{display:flex;align-items:center;gap:12px;color:#91a6b6;font-size:12px;font-weight:800;white-space:nowrap}.archive-v9-side i{width:42px;height:42px;border-radius:13px;background:#edf7ff;color:#2196f3;display:grid;place-items:center;font-size:18px}
+
+/* PDF print surface */
+.ct-pdf-sheet{font-family:Cairo,Arial,sans-serif!important;background:#fff;color:#12243b;width:794px;padding:32px}.ct-pdf-sheet *{box-sizing:border-box}.ct-pdf-head{display:grid;grid-template-columns:1fr 110px;gap:18px;align-items:center;border-bottom:2px solid #1d4b91;padding-bottom:15px}.ct-pdf-brand{text-align:right}.ct-pdf-brand h1{font-size:25px;color:#173d82;margin:0 0 6px}.ct-pdf-brand p{margin:2px 0;color:#506b86;font-size:11px}.ct-pdf-logo{width:92px;height:92px;object-fit:cover;border-radius:12px;border:1px solid #e0e7ef}.ct-pdf-title{margin:16px 0 12px;border:1.5px solid #1d4b91;border-radius:8px;padding:10px 15px;text-align:center;color:#173d82;font-size:17px;font-weight:900}.ct-pdf-table{width:100%;border-collapse:collapse;font-size:10px;direction:rtl}.ct-pdf-table th,.ct-pdf-table td{border:1px solid #475569;padding:7px 5px;text-align:center;vertical-align:middle}.ct-pdf-table th{background:#f7fafc;color:#173d82;font-size:11px}.ct-pdf-table .details{text-align:right}.ct-pdf-green{color:#16803c;font-weight:900}.ct-pdf-red{color:#d73737;font-weight:900}.ct-pdf-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:13px 0}.ct-pdf-summary div{border:1px solid #dce5ee;padding:10px;text-align:center}.ct-pdf-summary small{display:block;color:#7890a4}.ct-pdf-summary strong{display:block;margin-top:4px;font-size:16px}.ct-pdf-footer{margin-top:15px;color:#8ba0b2;font-size:9px;text-align:center}
+
+@media(max-width:430px){
+  .debt-search-toolbar{grid-template-columns:minmax(0,1fr) 56px 56px;gap:9px}.debt-search-box,.debt-tool-btn{height:56px}.debt-tool-btn{width:56px}
+  .edit-person-scroll{padding:25px 28px 150px}.edit-field input{height:84px}.edit-person-footer{gap:28px}.edit-person-footer button{height:82px}
+  .archive-v9-stamp{font-size:13px}.archive-v9-line{grid-template-columns:46px minmax(0,1fr)}.archive-v9-label{font-size:16px}.archive-v9-balance strong{font-size:20px}
+}
+</style>
+
 </head>
 <body class="text-gray-800 antialiased font-sans flex flex-col w-full relative">
 
@@ -386,12 +430,13 @@
                     <button onclick="exportExcel()" class="bg-green-50 text-success p-3 rounded-xl font-semibold flex flex-col items-center gap-1 active:bg-green-100"><i class="fas fa-file-excel text-xl"></i><span class="text-[11px]">إكسل</span></button>
                 </div>
             </div>
-            <div class="flex items-center gap-2 mb-4">
-                <div class="flex-1 relative">
-                    <input type="text" id="searchInput" placeholder="البحث" class="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 pr-10 focus:outline-none focus:border-brand text-right shadow-sm">
-                    <i class="fas fa-search absolute right-4 top-4 text-gray-400"></i>
+            <div class="debt-search-toolbar mb-4">
+                <div class="debt-search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="البحث">
                 </div>
-                <button onclick="openFilterModal()" class="w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-brand shadow-sm active:bg-gray-50"><i class="fas fa-sliders-h"></i></button>
+                <button onclick="openFilterModal()" class="debt-tool-btn" aria-label="تصفية"><i class="fas fa-sliders-h"></i></button>
+                <button onclick="downloadAccountsPDF()" class="debt-tool-btn" aria-label="تحميل PDF"><i class="far fa-file-pdf"></i></button>
             </div>
             <div class="flex justify-between items-center mb-3 px-1"><span class="text-brand font-bold text-sm" id="list-title">العملاء (0)</span></div>
             <div id="persons-list" class="space-y-3 records-safe-space"></div>
@@ -641,10 +686,10 @@
     <div id="personDetailModal" class="fixed inset-0 z-50 hidden bg-white flex-col">
         <div class="flex items-center justify-between p-4 border-b bg-white">
             <div class="flex items-center gap-1"><button onclick="openPersonArchive()" class="text-brand text-lg w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center" title="فتح الأرشيف"><i class="fas fa-box-archive"></i></button><button onclick="openPersonOptions()" class="text-brand text-xl w-9 h-9 flex items-center justify-center" title="خيارات"><i class="fas fa-ellipsis-v"></i></button></div>
-            <div class="flex flex-col items-center">
+            <button type="button" onclick="editCurrentPerson()" class="person-title-button flex flex-col items-center">
                 <h2 class="font-bold text-brand text-lg" id="detail-name">اسم العميل</h2>
                 <span class="text-xs text-gray-400">اضغط هنا لمعلومات الاتصال</span>
-            </div>
+            </button>
             <button onclick="closePersonDetail()" class="text-brand text-xl w-8 h-8 flex items-center justify-center"><i class="fas fa-chevron-right"></i></button>
         </div>
         
@@ -675,6 +720,48 @@
         <div class="fixed bottom-0 left-0 right-0 p-4 bg-white border-t flex gap-3 z-10 pb-8">
             <button onclick="openKeypad('credit')" class="flex-1 bg-green-50 text-success border border-green-100 py-3 rounded-xl font-bold text-lg active:bg-green-100">أعطيت</button>
             <button onclick="openKeypad('debit')" class="flex-1 bg-red-50 text-danger border border-red-100 py-3 rounded-xl font-bold text-lg active:bg-red-100">أخذت</button>
+        </div>
+    </div>
+
+    <!-- تعديل العميل / المورد -->
+    <div id="personEditModal" class="fixed inset-0 z-[88] hidden bg-white flex-col">
+        <div class="edit-person-header">
+            <div class="w-10"></div>
+            <h2 id="edit-person-title">تعديل الحساب</h2>
+            <button type="button" onclick="closePersonEdit()" class="edit-person-back"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="edit-person-scroll">
+            <div class="edit-field">
+                <label>الاسم</label>
+                <input id="edit-person-name" type="text" autocomplete="off">
+            </div>
+            <div class="edit-field">
+                <label>رقم الهاتف</label>
+                <div class="edit-phone-wrap">
+                    <input id="edit-person-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="+970597603119" oninput="updateEditPhoneFlag()">
+                    <span id="edit-phone-flag" class="edit-phone-flag hidden" aria-hidden="true"></span>
+                </div>
+            </div>
+            <div class="edit-field">
+                <label>العنوان</label>
+                <input id="edit-person-address" type="text" placeholder="اكتب العنوان">
+            </div>
+            <button id="convert-person-type-btn" type="button" onclick="convertCurrentPersonType()" class="edit-convert-btn">
+                <span class="edit-convert-icon"><i class="fas fa-people-arrows"></i></span>
+                <strong id="convert-person-type-label">تحويل لمورد</strong>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="edit-categories-card">
+                <div class="edit-categories-head">
+                    <span>التصنيفات</span>
+                    <button type="button" onclick="openCategoryScreen()"><i class="fas fa-plus-circle"></i> إدارة التصنيفات</button>
+                </div>
+                <div id="edit-person-category" class="edit-category-value">بدون تصنيف</div>
+            </div>
+        </div>
+        <div class="edit-person-footer">
+            <button type="button" onclick="saveCurrentPersonEdit()" class="edit-save-btn">تأكيد</button>
+            <button type="button" onclick="deleteCurrentPersonFromEdit()" class="edit-delete-btn">حذف</button>
         </div>
     </div>
 
@@ -948,8 +1035,12 @@
                 <button onclick="closePersonArchive()" class="text-brand text-2xl"><i class="fas fa-chevron-right"></i></button>
             </div>
             <div class="px-4 pt-4"><div class="soft-card p-4"><div class="text-brand font-extrabold">رصيد الأرشيف</div><div id="person-archive-balance" class="text-3xl font-extrabold text-success mt-2" dir="ltr">₪ 0.0</div><div id="person-archive-count" class="text-xs text-gray-400 mt-1">0 معاملة</div></div></div>
-            <div class="flex-1 overflow-y-auto p-4 pb-28"><div id="person-archive-list" class="person-archive-list"></div><div id="person-archive-more" class="h-14 flex items-center justify-center text-gray-400 text-xs font-bold"></div></div>
-            <div class="absolute bottom-0 left-0 right-0 p-4 bg-white border-t safe-bottom"><button onclick="closePersonArchive()" class="w-full bg-brand text-white py-4 rounded-xl font-bold">الرجوع إلى صفحة الحساب</button></div>
+            <div class="px-4 pt-3"><label class="archive-select-all person-restore-select"><span>كل المعاملات</span><input id="person-archive-select-all" type="checkbox" onchange="togglePersonArchiveAll(this.checked)"></label></div>
+            <div class="flex-1 overflow-y-auto px-4 pb-32"><div id="person-archive-list" class="person-archive-list"></div><div id="person-archive-more" class="h-14 flex items-center justify-center text-gray-400 text-xs font-bold"></div></div>
+            <div class="absolute bottom-0 left-0 right-0 grid grid-cols-2 gap-3 p-4 bg-white border-t safe-bottom person-archive-actions">
+                <button onclick="deleteSelectedPersonArchive()" class="bg-red-50 text-danger border border-red-100 py-4 rounded-xl font-bold"><i class="fas fa-trash ml-1"></i> حذف المحدد</button>
+                <button onclick="restoreSelectedPersonArchive()" class="bg-brand text-white py-4 rounded-xl font-bold"><i class="fas fa-rotate-left ml-1"></i> إرجاع المحدد</button>
+            </div>
         </div>
     </div>
 
@@ -1274,6 +1365,8 @@
   let personArchiveCursor={beforeTs:Number.MAX_SAFE_INTEGER,beforeId:'\uffff',done:false};
   let personArchiveLoading=false;
   let personArchiveSummaryState=null;
+  let restoreSelection=new Set();
+  let restoreAllArchive=false;
 
   // Names are always typed explicitly. No customer/supplier autocomplete popup.
   window.setupAutocomplete=function(){const box=document.getElementById('name-suggestions');if(box){box.innerHTML='';box.classList.add('hidden')}};
@@ -1283,8 +1376,9 @@
   }
   function archiveParentKey(){return personKey(currentDetailName,currentDebtTab)}
   function archiveRowHtml(r,{selectable=false}={}){
-    const out=Number(r.debit)>0,amt=getDebtAmount(r),checked=moveSelection.has(String(r.id));
-    return `<div class="person-archive-row" ${selectable?'':`data-archive-id="${encodeURIComponent(String(r.id))}" onclick="CashTopSync.openDebtArchivedTransaction(decodeURIComponent(this.dataset.archiveId))"`}>${selectable?`<input class="move-archive-check" type="checkbox" value="${escapeHTML(String(r.id))}" ${checked?'checked':''} onchange="setMoveArchiveSelection('${escapeHTML(String(r.id))}',this.checked)">`:`<span class="w-10 h-10 rounded-xl ${out?'bg-red-50 text-danger':'bg-green-50 text-success'} grid place-items-center overflow-hidden" data-person-archive-image="${escapeHTML(String(r.id))}">${(r.imageUrl||r.image)&&!String(r.imageUrl||r.image).startsWith('data:')?`<img src="${escapeHTML(r.imageUrl||r.image)}" class="w-full h-full object-cover" alt="">`:`<i class="fas ${r.imageLocalId?'fa-image':(out?'fa-arrow-up':'fa-arrow-down')}"></i>`}</span>`}<div class="main"><b>${todayLabel(r.timestamp)} ساعة ${shortTime(r.timestamp)}</b><small>${escapeHTML(r.note||'بدون ملاحظة')}${r.image||r.imageUrl||r.imageLocalId?' • صورة مرفقة':''}</small></div><div class="amount ${out?'out':'in'}">₪ ${fmtMoney(amt)}<small style="display:block;font-size:11px;color:#9aaebe;margin-top:3px;direction:rtl">${out?'أخذت':'أعطيت'}</small></div></div>`;
+    const out=Number(r.debit)>0,amt=getDebtAmount(r),moveChecked=moveSelection.has(String(r.id)),restoreChecked=restoreSelection.has(String(r.id));
+    if(selectable)return `<div class="person-archive-row"><input class="move-archive-check" type="checkbox" value="${escapeHTML(String(r.id))}" ${moveChecked?'checked':''} onchange="setMoveArchiveSelection('${escapeHTML(String(r.id))}',this.checked)"><div class="main"><b>${todayLabel(r.timestamp)} ساعة ${shortTime(r.timestamp)}</b><small>${escapeHTML(r.note||'بدون ملاحظة')}${r.image||r.imageUrl||r.imageLocalId?' • صورة مرفقة':''}</small></div><div class="amount ${out?'out':'in'}">₪ ${fmtMoney(amt)}<small style="display:block;font-size:11px;color:#9aaebe;margin-top:3px;direction:rtl">${out?'أخذت':'أعطيت'}</small></div></div>`;
+    return `<div class="person-archive-row v9-selectable"><label class="archive-check-wrap" onclick="event.stopPropagation()"><input type="checkbox" ${restoreChecked?'checked':''} onchange="setPersonArchiveSelection('${escapeHTML(String(r.id))}',this.checked)"></label><div class="main" data-archive-id="${encodeURIComponent(String(r.id))}" onclick="CashTopSync.openDebtArchivedTransaction(decodeURIComponent(this.dataset.archiveId))"><div style="display:flex;align-items:center;gap:10px"><span class="w-10 h-10 rounded-xl ${out?'bg-red-50 text-danger':'bg-green-50 text-success'} grid place-items-center overflow-hidden shrink-0" data-person-archive-image="${escapeHTML(String(r.id))}">${(r.imageUrl||r.image)&&!String(r.imageUrl||r.image).startsWith('data:')?`<img src="${escapeHTML(r.imageUrl||r.image)}" class="w-full h-full object-cover" alt="">`:`<i class="fas ${r.imageLocalId?'fa-image':(out?'fa-arrow-up':'fa-arrow-down')}"></i>`}</span><div style="min-width:0"><b>${todayLabel(r.timestamp)} ساعة ${shortTime(r.timestamp)}</b><small>${escapeHTML(r.note||'بدون ملاحظة')}${r.image||r.imageUrl||r.imageLocalId?' • صورة مرفقة':''}</small></div></div></div><div class="amount ${out?'out':'in'}" data-archive-id="${encodeURIComponent(String(r.id))}" onclick="CashTopSync.openDebtArchivedTransaction(decodeURIComponent(this.dataset.archiveId))">₪ ${fmtMoney(amt)}<small style="display:block;font-size:11px;color:#9aaebe;margin-top:3px;direction:rtl">${out?'أخذت':'أعطيت'}</small></div></div>`;
   }
 
   window.openMoveToArchive=function(){
@@ -1306,7 +1400,7 @@
   };
 
   window.openPersonArchive=async function(){
-    document.getElementById('person-archive-name').textContent=currentDetailName;document.getElementById('personArchiveModal').classList.add('show');personArchiveRows=[];personArchiveSummaryState=null;personArchiveCursor={beforeTs:Number.MAX_SAFE_INTEGER,beforeId:'\uffff',done:false};document.getElementById('person-archive-list').innerHTML='';await Promise.all([loadMorePersonArchive(),refreshPersonArchiveSummary()]);
+    document.getElementById('person-archive-name').textContent=currentDetailName;document.getElementById('personArchiveModal').classList.add('show');restoreSelection.clear();restoreAllArchive=false;const sel=document.getElementById('person-archive-select-all');if(sel)sel.checked=false;personArchiveRows=[];personArchiveSummaryState=null;personArchiveCursor={beforeTs:Number.MAX_SAFE_INTEGER,beforeId:'\uffff',done:false};document.getElementById('person-archive-list').innerHTML='';await Promise.all([loadMorePersonArchive(),refreshPersonArchiveSummary()]);
   };
   window.closePersonArchive=function(){document.getElementById('personArchiveModal').classList.remove('show')};
   async function loadMorePersonArchive(){
@@ -1322,10 +1416,43 @@
     const st=personArchiveSummaryState;if(!st)return;const bal=Number(st.balance||0),b=document.getElementById('person-archive-balance');b.textContent=`₪ ${fmtMoney(Math.abs(bal))}`;b.className=`text-3xl font-extrabold mt-2 ${bal<0?'text-danger':'text-success'}`;document.getElementById('person-archive-count').textContent=`${Number(st.count||0)} معاملة${st.partial?' تقريباً':''}`;
   }
   function renderPersonArchiveRows(){
-    const box=document.getElementById('person-archive-list'),more=document.getElementById('person-archive-more');
+    const box=document.getElementById('person-archive-list'),more=document.getElementById('person-archive-more'),all=document.getElementById('person-archive-select-all');if(all)all.checked=restoreAllArchive||(personArchiveRows.length>0&&personArchiveRows.every(r=>restoreSelection.has(String(r.id))));
     if(!personArchiveRows.length){box.innerHTML='<div class="archive-person-empty"><i class="fas fa-box-open"></i><b>لا توجد معاملات في الأرشيف</b></div>';more.textContent='';document.getElementById('person-archive-balance').textContent='₪ 0.0';document.getElementById('person-archive-count').textContent='0 معاملة';return}
     box.innerHTML=personArchiveRows.map(r=>archiveRowHtml(r)).join('');box.querySelectorAll('[data-person-archive-image]').forEach(async slot=>{const r=personArchiveRows.find(x=>String(x.id)===slot.dataset.personArchiveImage);if(!r||slot.querySelector('img'))return;try{const src=await CashTopSync.resolveRecordImage(r);if(src)slot.innerHTML=`<img src="${escapeHTML(src)}" class="w-full h-full object-cover" alt="">`}catch(_){}});if(personArchiveSummaryState)renderPersonArchiveSummary();else{let bal=0;personArchiveRows.forEach(r=>bal+=(Number(r.credit)||0)-(Number(r.debit)||0));const b=document.getElementById('person-archive-balance');b.textContent=`₪ ${fmtMoney(Math.abs(bal))}`;b.className=`text-3xl font-extrabold mt-2 ${bal<0?'text-danger':'text-success'}`;document.getElementById('person-archive-count').textContent=`${personArchiveRows.length}${personArchiveCursor.done?'':'+'} معاملة`;}more.innerHTML=personArchiveCursor.done?'':`<button onclick="loadMorePersonArchiveV8()" class="archive-link-pill"><i class="fas fa-chevron-down"></i>تحميل المزيد</button>`;
   }
+  window.setPersonArchiveSelection=function(id,on){restoreAllArchive=false;on?restoreSelection.add(String(id)):restoreSelection.delete(String(id));const all=document.getElementById('person-archive-select-all');if(all)all.checked=false};
+  window.togglePersonArchiveAll=function(on){restoreAllArchive=!!on;restoreSelection=new Set(on?personArchiveRows.map(r=>String(r.id)):[]);renderPersonArchiveRows();const all=document.getElementById('person-archive-select-all');if(all)all.checked=!!on};
+  async function processAllPersonArchive(mode){
+    const parent=archiveParentKey();let total=0,guard=0,beforeTs=Number.MAX_SAFE_INTEGER,beforeId='\uffff';
+    while(guard++<100000){
+      const page=await CashTopSync.listDebtArchive(parent,beforeTs,beforeId,100);if(!page.length)break;
+      const last=page[page.length-1];
+      if(mode==='restore'){
+        const restored=await CashTopSync.restoreDebtArchiveBatch(parent,page);
+        for(const r of restored)if(!records.some(x=>String(x.id)===String(r.id)))records.push(r);
+        total+=restored.length;saveData();
+      }else{total+=await CashTopSync.deleteDebtArchiveBatch(parent,page)}
+      beforeTs=Number(last.timestamp||0);beforeId=String(last.id);
+      if(page.length<100)break;
+    }
+    return total;
+  }
+  window.restoreSelectedPersonArchive=async function(){
+    const rows=personArchiveRows.filter(r=>restoreSelection.has(String(r.id)));if(!restoreAllArchive&&!rows.length){toast('حدد معاملة واحدة على الأقل','info');return}
+    const label=restoreAllArchive?'كل معاملات الأرشيف':`${rows.length} معاملة`;
+    const ask=await Swal.fire({title:'إرجاع المعاملات؟',text:`سيتم إرجاع ${label} إلى صفحة الحساب.`,icon:'question',showCancelButton:true,confirmButtonText:'إرجاع',cancelButtonText:'إلغاء'});if(!ask.isConfirmed)return;
+    Swal.fire({title:'جاري الإرجاع...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    try{let count=0;if(restoreAllArchive)count=await processAllPersonArchive('restore');else{const restored=await CashTopSync.restoreDebtArchiveBatch(archiveParentKey(),rows);for(const r of restored)if(!records.some(x=>String(x.id)===String(r.id)))records.push(r);count=restored.length;saveData()}restoreSelection.clear();restoreAllArchive=false;await refreshPersonArchiveAfterMutation();renderPersonDetailList();renderDebtsList();Swal.close();toast(`تم إرجاع ${count} معاملة`)}
+    catch(e){Swal.close();toast(e.message||'تعذر إرجاع المعاملات','error')}
+  };
+  window.deleteSelectedPersonArchive=async function(){
+    const rows=personArchiveRows.filter(r=>restoreSelection.has(String(r.id)));if(!restoreAllArchive&&!rows.length){toast('حدد معاملة واحدة على الأقل','info');return}
+    const label=restoreAllArchive?'كل معاملات الأرشيف':`${rows.length} معاملة`;
+    const ask=await Swal.fire({title:'حذف المعاملات؟',text:`سيتم حذف ${label} نهائياً من الأرشيف.`,icon:'warning',showCancelButton:true,confirmButtonText:'حذف',confirmButtonColor:'#ef4444',cancelButtonText:'إلغاء'});if(!ask.isConfirmed)return;
+    Swal.fire({title:'جاري الحذف...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    try{const count=restoreAllArchive?await processAllPersonArchive('delete'):await CashTopSync.deleteDebtArchiveBatch(archiveParentKey(),rows);restoreSelection.clear();restoreAllArchive=false;await refreshPersonArchiveAfterMutation();Swal.close();toast(`تم حذف ${count} معاملة`)}
+    catch(e){Swal.close();toast(e.message||'تعذر حذف المعاملات','error')}
+  };
   window.loadMorePersonArchiveV8=loadMorePersonArchive;
   window.refreshPersonArchiveAfterMutation=async function(){if(!document.getElementById('personArchiveModal').classList.contains('show'))return;personArchiveRows=[];personArchiveCursor={beforeTs:Number.MAX_SAFE_INTEGER,beforeId:'\uffff',done:false};await Promise.all([loadMorePersonArchive(),refreshPersonArchiveSummary()])};
 
@@ -1356,6 +1483,180 @@
   // Android keyboard: keep Add note focused and visible instead of hiding it on viewport resize.
   const note=document.getElementById('keypad-note'),modal=document.getElementById('keypadModal');
   if(note&&modal){note.addEventListener('focus',()=>{modal.classList.add('keyboard-open');setTimeout(()=>note.scrollIntoView({block:'center',behavior:'smooth'}),120)});note.addEventListener('blur',()=>setTimeout(()=>modal.classList.remove('keyboard-open'),180));}
+})();
+</script>
+
+
+<script id="v9-features">
+(function(){
+'use strict';
+
+/* ---------- تعديل العميل / المورد ---------- */
+const PHONE_FLAGS=[
+ ['970','🇵🇸'],['972','🇮🇱'],['962','🇯🇴'],['966','🇸🇦'],['971','🇦🇪'],['974','🇶🇦'],['965','🇰🇼'],['973','🇧🇭'],['968','🇴🇲'],['964','🇮🇶'],['963','🇸🇾'],['961','🇱🇧'],['20','🇪🇬'],['218','🇱🇾'],['216','🇹🇳'],['213','🇩🇿'],['212','🇲🇦'],['249','🇸🇩'],['967','🇾🇪'],['90','🇹🇷'],['1','🇺🇸'],['44','🇬🇧'],['49','🇩🇪'],['33','🇫🇷'],['39','🇮🇹'],['34','🇪🇸'],['31','🇳🇱'],['46','🇸🇪'],['47','🇳🇴'],['45','🇩🇰'],['7','🇷🇺'],['380','🇺🇦'],['91','🇮🇳'],['92','🇵🇰'],['880','🇧🇩'],['86','🇨🇳'],['81','🇯🇵'],['82','🇰🇷'],['60','🇲🇾'],['62','🇮🇩'],['63','🇵🇭'],['61','🇦🇺'],['64','🇳🇿'],['27','🇿🇦'],['234','🇳🇬'],['254','🇰🇪'],['251','🇪🇹'],['55','🇧🇷'],['52','🇲🇽'],['54','🇦🇷'],['56','🇨🇱'],['57','🇨🇴'],['58','🇻🇪'],['1','🇨🇦']
+].sort((a,b)=>b[0].length-a[0].length);
+
+function cleanPhoneInput(v){
+  let raw=String(v||'').trim().replace(/[^\d+]/g,'');
+  if(raw.startsWith('00'))raw='+'+raw.slice(2);
+  if(raw && !raw.startsWith('+'))raw='+'+raw;
+  return raw;
+}
+window.updateEditPhoneFlag=function(){
+  const input=document.getElementById('edit-person-phone'),flag=document.getElementById('edit-phone-flag');if(!input||!flag)return;
+  const raw=cleanPhoneInput(input.value),digits=raw.replace(/\D/g,'');
+  const hit=PHONE_FLAGS.find(([code])=>digits.startsWith(code));
+  if(hit&&raw.startsWith('+')){flag.textContent=hit[1];flag.classList.remove('hidden')}else{flag.textContent='';flag.classList.add('hidden')}
+};
+function renderEditCategory(){
+  const el=document.getElementById('edit-person-category');if(!el)return;
+  el.innerHTML=selectedCategory?`${categoryIconHTML(selectedCategory,'ml-1')} ${escapeHTML(selectedCategory.name)}`:'بدون تصنيف';
+  el.className=selectedCategory?'edit-category-value text-brand':'edit-category-value';
+}
+window.editCurrentPerson=function(){
+  if(!currentDetailName)return;
+  const c=getContact(currentDetailName,currentDebtTab)||{};
+  document.getElementById('edit-person-title').textContent=currentDetailName;
+  document.getElementById('edit-person-name').value=currentDetailName;
+  document.getElementById('edit-person-phone').value=c.phone?('+'+String(c.phone).replace(/\D/g,'')):'';
+  document.getElementById('edit-person-address').value=c.address||'';
+  selectedCategory=categories.find(x=>String(x.id)===String(c.categoryId))||null;
+  document.getElementById('convert-person-type-label').textContent=currentDebtTab==='customers'?'تحويل لمورد':'تحويل لعميل';
+  renderEditCategory();updateEditPhoneFlag();
+  const m=document.getElementById('personEditModal');m.classList.remove('hidden');m.classList.add('flex');
+};
+window.closePersonEdit=function(){const m=document.getElementById('personEditModal');m.classList.add('hidden');m.classList.remove('flex')};
+const _confirmCategoryV9=window.confirmCategory;
+window.confirmCategory=function(){if(_confirmCategoryV9)_confirmCategoryV9();renderEditCategory()};
+
+async function syncPersonMove(oldName,newName,oldType,newType,oldContact){
+  const oldKey=personKey(oldName,oldType),newKey=personKey(newName,newType);
+  const changedRecords=records.filter(r=>r.type===newType&&r.name===newName);
+  const changedReminders=reminders.filter(r=>r.type===newType&&r.name===newName);
+  for(const r of changedRecords)await CashTopSync.putEntity('debt_record',r.id,r,{parentId:newKey,sortTs:r.timestamp||0,queue:true});
+  for(const r of changedReminders)await CashTopSync.putEntity('reminder',r.id,r,{parentId:newKey,sortTs:r.at||0,queue:true});
+  await CashTopSync.putEntity('contact',newKey,contacts[newKey],{queue:true});
+  if(oldKey!==newKey)await CashTopSync.deleteEntity('contact',oldKey);
+  await CashTopSync.moveDebtArchivePerson(oldKey,newKey,newType,newName);
+  if(oldContact?.publicKey){
+    try{await CashTopDirectAPI.request('/public-links/customer',{method:'POST',token:window.__ctSession?.token||'',body:{personKey:newKey,name:newName,type:newType,publicKey:oldContact.publicKey}})}catch(e){console.warn('public link move',e)}
+  }
+}
+window.saveCurrentPersonEdit=async function(){
+  const oldName=currentDetailName,oldType=currentDebtTab,oldContact={...(getContact(oldName,oldType)||{})};
+  const newName=document.getElementById('edit-person-name').value.trim();
+  if(!newName){toast('الاسم مطلوب','error');return}
+  if(newName!==oldName&&records.some(r=>r.type===oldType&&r.name===newName)){toast('يوجد حساب آخر بنفس الاسم','error');return}
+  const raw=cleanPhoneInput(document.getElementById('edit-person-phone').value),phone=raw.replace(/\D/g,''),address=document.getElementById('edit-person-address').value.trim();
+  const oldKey=personKey(oldName,oldType),newKey=personKey(newName,oldType);
+  records.forEach(r=>{if(r.type===oldType&&r.name===oldName)r.name=newName});
+  reminders.forEach(r=>{if(r.type===oldType&&r.name===oldName)r.name=newName});
+  contacts[newKey]={...oldContact,phone,address,categoryId:selectedCategory?.id||null};
+  if(oldKey!==newKey)delete contacts[oldKey];
+  currentDetailName=newName;saveData();renderPersonDetailList();renderDebtsList();document.getElementById('detail-name').textContent=newName;
+  closePersonEdit();
+  Swal.fire({title:'جاري حفظ التعديل...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  try{await syncPersonMove(oldName,newName,oldType,oldType,oldContact);Swal.close();toast('تم تحديث الحساب')}
+  catch(e){Swal.close();toast('تم الحفظ محلياً وسيعاد مزامنته تلقائياً','info');console.warn(e)}
+};
+window.convertCurrentPersonType=async function(){
+  const oldName=currentDetailName,oldType=currentDebtTab,newType=oldType==='customers'?'suppliers':'customers',targetLabel=newType==='suppliers'?'مورد':'عميل';
+  const ask=await Swal.fire({title:`تحويل إلى ${targetLabel}؟`,text:'سيتم نقل الحساب ومعاملاته وبياناته والأرشيف بالكامل، وليس نسخها.',icon:'question',showCancelButton:true,confirmButtonText:'نقل الحساب',cancelButtonText:'إلغاء'});if(!ask.isConfirmed)return;
+  const oldContact={...(getContact(oldName,oldType)||{})},oldKey=personKey(oldName,oldType),newKey=personKey(oldName,newType);
+  if(records.some(r=>r.type===newType&&r.name===oldName)){toast(`يوجد ${targetLabel} بنفس الاسم بالفعل`,'error');return}
+  records.forEach(r=>{if(r.type===oldType&&r.name===oldName)r.type=newType});
+  reminders.forEach(r=>{if(r.type===oldType&&r.name===oldName)r.type=newType});
+  contacts[newKey]={...oldContact};delete contacts[oldKey];saveData();
+  Swal.fire({title:'جاري نقل الحساب...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  try{await syncPersonMove(oldName,oldName,oldType,newType,oldContact);Swal.close()}catch(e){Swal.close();console.warn(e);toast('تم النقل محلياً وسيكتمل مع المزامنة','info')}
+  closePersonEdit();closePersonDetail();switchDebtTab(newType);currentDetailName=oldName;setTimeout(()=>openPersonDetail(oldName),90);toast(`تم نقل الحساب إلى ${targetLabel}`);
+};
+window.deleteCurrentPersonFromEdit=async function(){closePersonEdit();setTimeout(()=>archivePerson(),80)};
+
+/* ---------- PDF بترويسة موحدة ---------- */
+function pdfHeader(title,sub=''){
+  const logo='./app-logo.png',name=escapeHTML(profile.name||'دفتر كاش توب');
+  return `<div class="ct-pdf-head"><div class="ct-pdf-brand"><h1>${name}</h1>${profile.address?`<p>${escapeHTML(profile.address)}</p>`:''}${profile.phone?`<p dir="ltr">${escapeHTML(profile.phone)}</p>`:''}<p>${escapeHTML(sub||'')}</p></div><img class="ct-pdf-logo" src="${logo}" alt=""></div><div class="ct-pdf-title">${escapeHTML(title)}</div>`;
+}
+async function savePdfHtml(html,filename){
+  const root=document.getElementById('pdf-render-root');root.innerHTML=`<div id="ct-pdf-v9" class="ct-pdf-sheet" dir="rtl">${html}<div class="ct-pdf-footer">دفتر كاش توب • ${new Date().toLocaleString('ar-EG')}</div></div>`;
+  try{
+    if(document.fonts?.ready)await document.fonts.ready;
+    const canvas=await html2canvas(document.getElementById('ct-pdf-v9'),{scale:1.8,backgroundColor:'#fff',useCORS:true,logging:false});
+    const {jsPDF}=window.jspdf,pdf=new jsPDF('p','mm','a4'),pageW=210,pageH=297,margin=8,imgW=pageW-margin*2,imgH=canvas.height*imgW/canvas.width,img=canvas.toDataURL('image/jpeg',.94),usable=pageH-margin*2;
+    let offset=0;pdf.addImage(img,'JPEG',margin,margin-offset,imgW,imgH,'FAST');offset+=usable;
+    while(offset<imgH){pdf.addPage();pdf.addImage(img,'JPEG',margin,margin-offset,imgW,imgH,'FAST');offset+=usable}
+    pdf.save(filename);
+  }finally{root.innerHTML=''}
+}
+function visibleAccountsForPdf(){
+  const q=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();let people=buildBalances(currentDebtTab);
+  if(q)people=people.filter(p=>p.name.toLowerCase().includes(q)||(getContact(p.name,p.type).phone||'').includes(q));
+  if(currentFilterStatus==='debit')people=people.filter(p=>p.net<0);else if(currentFilterStatus==='credit')people=people.filter(p=>p.net>0);else if(currentFilterStatus==='settled')people=people.filter(p=>Math.abs(p.net)<.0001);
+  if(currentFilterSort==='new')people.sort((a,b)=>b.timestamp-a.timestamp);else if(currentFilterSort==='old')people.sort((a,b)=>a.timestamp-b.timestamp);else if(currentFilterSort==='high')people.sort((a,b)=>Math.abs(b.net)-Math.abs(a.net));else if(currentFilterSort==='low')people.sort((a,b)=>Math.abs(a.net)-Math.abs(b.net));
+  return people;
+}
+window.downloadAccountsPDF=async function(){
+  const people=visibleAccountsForPdf();if(!people.length){toast('لا توجد بيانات لتصديرها','info');return}
+  Swal.fire({title:'جاري إنشاء PDF...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  try{
+    const title=`كشف أرصدة ${currentDebtTab==='customers'?'العملاء':'الموردين'}`;
+    const rows=people.map((p,i)=>{const c=getContact(p.name,p.type)||{};return `<tr><td>${i+1}</td><td class="details">${escapeHTML(p.name)}</td><td dir="ltr">${c.phone?('+'+escapeHTML(String(c.phone).replace(/\D/g,''))):'—'}</td><td class="ct-pdf-red">${moneyRaw(p.debit)}</td><td class="ct-pdf-green">${moneyRaw(p.credit)}</td><td class="${p.net<0?'ct-pdf-red':'ct-pdf-green'}">${moneyRaw(Math.abs(p.net))}</td></tr>`}).join('');
+    await savePdfHtml(`${pdfHeader(title,'كشف الحسابات الحالي')}<table class="ct-pdf-table"><thead><tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>مدين / أخذت</th><th>دائن / أعطيت</th><th>الرصيد</th></tr></thead><tbody>${rows}</tbody></table>`,`CashTop_${currentDebtTab}_${new Date().toISOString().slice(0,10)}.pdf`);
+    Swal.close();toast('تم تحميل PDF')
+  }catch(e){Swal.close();console.error(e);toast('تعذر إنشاء PDF','error')}
+};
+window.downloadReportPDF=async function(){
+  const data=getReportData();if(!data.length){toast('لا توجد بيانات لتصديرها','info');return}
+  Swal.fire({title:'جاري إنشاء تقرير PDF...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+  try{
+    let html='',filename=`CashTop_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+    if(reportSource==='debt'&&reportPersonFilter){
+      const chronological=[...data].sort((a,b)=>Number(a.timestamp||0)-Number(b.timestamp||0));let running=0,totalD=0,totalC=0;
+      const rows=chronological.map(r=>{const d=Number(r.debit||0),c=Number(r.credit||0);totalD+=d;totalC+=c;running+=c-d;return `<tr><td>${shortDate(r.timestamp)}</td><td class="ct-pdf-red">${d?moneyRaw(d):''}</td><td class="ct-pdf-green">${c?moneyRaw(c):''}</td><td class="${running<0?'ct-pdf-red':'ct-pdf-green'}">${moneyRaw(Math.abs(running))}</td><td>${d>0?'أخذت':'أعطيت'}</td><td class="details">${escapeHTML(r.note||'—')}</td></tr>`}).join('');
+      html=`${pdfHeader(`كشف حساب: ${reportPersonFilter}`,periodLabel())}<table class="ct-pdf-table"><thead><tr><th>التاريخ</th><th>مدين</th><th>دائن</th><th>الرصيد</th><th>نوع الحركة</th><th>التفاصيل</th></tr></thead><tbody><tr><td></td><td></td><td></td><td>0.00</td><td></td><td class="details ct-pdf-green">الرصيد السابق</td></tr>${rows}<tr><th>الإجمالي</th><th>${moneyRaw(totalD)}</th><th>${moneyRaw(totalC)}</th><th>${moneyRaw(Math.abs(totalC-totalD))}</th><th colspan="2"></th></tr></tbody></table>`;
+      filename=`CashTop_Statement_${reportPersonFilter}_${new Date().toISOString().slice(0,10)}.pdf`;
+    }else if(reportSource==='cash'){
+      let running=0,totalIn=0,totalOut=0;const rows=[...data].sort((a,b)=>a.timestamp-b.timestamp).map(r=>{const incoming=r.type==='in';incoming?totalIn+=Number(r.amount):totalOut+=Number(r.amount);running+=(incoming?1:-1)*Number(r.amount);return `<tr><td>${shortDate(r.timestamp)} ${shortTime(r.timestamp)}</td><td class="ct-pdf-red">${!incoming?moneyRaw(r.amount):''}</td><td class="ct-pdf-green">${incoming?moneyRaw(r.amount):''}</td><td class="${running<0?'ct-pdf-red':'ct-pdf-green'}">${moneyRaw(Math.abs(running))}</td><td>${incoming?'دخل':'مصروف'}</td><td class="details">${escapeHTML(r.note||'—')}</td></tr>`}).join('');
+      html=`${pdfHeader('تقرير دفتر النقدية',periodLabel())}<table class="ct-pdf-table"><thead><tr><th>التاريخ</th><th>خارج</th><th>داخل</th><th>الرصيد</th><th>نوع الحركة</th><th>التفاصيل</th></tr></thead><tbody>${rows}<tr><th>الإجمالي</th><th>${moneyRaw(totalOut)}</th><th>${moneyRaw(totalIn)}</th><th>${moneyRaw(Math.abs(totalIn-totalOut))}</th><th colspan="2"></th></tr></tbody></table>`;
+    }else{
+      const rows=data.map(r=>`<tr><td>${shortDate(r.timestamp)} ${shortTime(r.timestamp)}</td><td class="details">${escapeHTML(r.name)}</td><td>${Number(r.debit)>0?'أخذت':'أعطيت'}</td><td>${moneyRaw(getDebtAmount(r))}</td><td class="details">${escapeHTML(r.note||'—')}</td></tr>`).join('');
+      html=`${pdfHeader('تقرير الديون',periodLabel())}<table class="ct-pdf-table"><thead><tr><th>التاريخ</th><th>الاسم</th><th>الحركة</th><th>المبلغ</th><th>التفاصيل</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    await savePdfHtml(html,filename);Swal.close();toast('تم تحميل تقرير PDF')
+  }catch(e){Swal.close();console.error(e);toast('تعذر إنشاء PDF','error')}
+};
+
+/* ---------- زر رجوع الهاتف: خطوة داخل التطبيق ولا يخرج ---------- */
+function closeTopView(){
+  const edit=document.getElementById('personEditModal');if(edit&&!edit.classList.contains('hidden')){closePersonEdit();return true}
+  const tx=document.getElementById('singleTransactionModal');if(tx&&!tx.classList.contains('hidden')){closeSingleTransaction();return true}
+  const move=document.getElementById('movePersonArchiveModal');if(move?.classList.contains('show')){closeMoveToArchive();return true}
+  const pa=document.getElementById('personArchiveModal');if(pa?.classList.contains('show')){closePersonArchive();return true}
+  const as=document.getElementById('archiveSessionModal');if(as?.classList.contains('show')){closeArchiveSession();return true}
+  const ar=document.getElementById('archiveModal');if(ar?.classList.contains('show')){closeArchive();return true}
+  const bk=document.getElementById('backupModal');if(bk?.classList.contains('show')){closeBackups();return true}
+  const st=document.getElementById('settingsModal');if(st?.classList.contains('show')){closeSettings();return true}
+  const rf=document.getElementById('reportFilterSheet');if(rf?.classList.contains('show')){closeReportFilterSheet();return true}
+  const rp=document.getElementById('reportPeriodSheet');if(rp?.classList.contains('show')){closeReportPeriodSheet();return true}
+  const rep=document.getElementById('reportModal');if(rep?.classList.contains('show')){closeReports();return true}
+  const rem=document.getElementById('reminderEditor');if(rem?.classList.contains('show')){closeReminderEditor();return true}
+  const coll=document.getElementById('debtCollectionModal');if(coll?.classList.contains('show')){closeDebtCollection();return true}
+  const fil=document.getElementById('filterModal');if(fil&&!fil.classList.contains('hidden')){closeFilterModal();return true}
+  const add=document.getElementById('addPersonModal');if(add&&!add.classList.contains('hidden')){closeAddModal();return true}
+  const cat2=document.getElementById('newCategoryScreen');if(cat2&&!cat2.classList.contains('hidden')){closeNewCategoryScreen();return true}
+  const cat=document.getElementById('categoryScreen');if(cat&&!cat.classList.contains('hidden')){closeCategoryScreen();return true}
+  const key=document.getElementById('keypadModal');if(key&&!key.classList.contains('hidden')){closeKeypad();return true}
+  const rec=document.getElementById('receiptScreen');if(rec&&!rec.classList.contains('hidden')){closeReceiptScreen();return true}
+  const pd=document.getElementById('personDetailModal');if(pd&&!pd.classList.contains('hidden')){closePersonDetail();return true}
+  if(currentMainPage!=='debts'){switchMainPage('debts');return true}
+  return false;
+}
+try{
+  if(!history.state?.ctRoot){history.replaceState({ctRoot:true},'',location.href);history.pushState({ctGuard:true},'',location.href)}
+  addEventListener('popstate',()=>{closeTopView();setTimeout(()=>history.pushState({ctGuard:true},'',location.href),0)});
+}catch(e){console.warn('history guard',e)}
+
 })();
 </script>
 

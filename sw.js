@@ -1,8 +1,8 @@
 'use strict';
-const VERSION='ct-ready-v8-20260806-1';
+const VERSION='ct-ready-v9-20260806-1';
 const STATIC=VERSION+'-static';
 const RUNTIME=VERSION+'-runtime';
-const SHELL=['./','./index.html','./app.html','./c.html','./direct-cloud.js','./cashtop-sync.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png'];
+const SHELL=['./','./index.html','./app.html','./c.html','./admin.html','./app-logo.png','./direct-cloud.js','./cashtop-sync.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png'];
 const REMOTE=[
   'https://cdn.tailwindcss.com/',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
@@ -10,7 +10,7 @@ const REMOTE=[
   'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap'
+  'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap'
 ];
 self.addEventListener('install',e=>{e.waitUntil((async()=>{const c=await caches.open(STATIC);await c.addAll(SHELL);await Promise.allSettled(REMOTE.map(async url=>{try{const req=new Request(url,{mode:'no-cors',credentials:'omit'}),r=await fetch(req);await c.put(req,r)}catch(_){}}));await self.skipWaiting()})())});
 self.addEventListener('activate',e=>{e.waitUntil((async()=>{for(const k of await caches.keys())if(![STATIC,RUNTIME].includes(k))await caches.delete(k);await self.clients.claim()})())});
