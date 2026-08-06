@@ -27,7 +27,8 @@ window.CashTopSync={
   login,logout,syncNow,queueLegacySnapshot,putEntity,deleteEntity,archivePage,
   storeArchiveSession,resolveRecordImage,chooseInstall,requestPersistentStorage,
   showStorageInfo,buildBackup,restoreBackup,hydrateLegacyFromIndexedDB,apiBase:()=>apiBase(),session:()=>session,
-  archiveDebtRecords,listDebtArchive,debtArchiveSummary,openDebtArchivedTransaction,restoreDebtArchivedTransaction,deleteDebtArchivedTransaction,restoreCashArchivedTransaction,moveDebtArchivePerson,restoreDebtArchiveBatch,deleteDebtArchiveBatch
+  archiveDebtRecords,listDebtArchive,debtArchiveSummary,openDebtArchivedTransaction,restoreDebtArchivedTransaction,deleteDebtArchivedTransaction,restoreCashArchivedTransaction,moveDebtArchivePerson,restoreDebtArchiveBatch,deleteDebtArchiveBatch,
+  deleteEntityAndImage,deleteImageAsset,downloadRecordImage
 };
 
 function readSession(){
@@ -120,10 +121,10 @@ async function putEntity(kind,id,payload,{parentId='',sortTs=0,deleted=false,que
 async function deleteEntity(kind,id,{parentId='',sortTs=0}={}){
   return putEntity(kind,id,{}, {parentId,sortTs,deleted:true,queue:true});
 }
-async function enqueueImage(blobId,targetKind,targetId,parentId='',sortTs=0){
+async function enqueueImage(blobId,targetKind,targetId,parentId='',sortTs=0,replaceUrl=''){
   const db=await openDb(),tx=db.transaction('outbox','readwrite');
   const opId=`img-${newOpId()}`;
-  tx.objectStore('outbox').put({opId,kind:'__image_upload__',createdAt:Date.now(),payload:{blobId,targetKind,targetId:String(targetId),parentId:String(parentId||''),sortTs:Number(sortTs||0)}});
+  tx.objectStore('outbox').put({opId,kind:'__image_upload__',createdAt:Date.now(),payload:{blobId,targetKind,targetId:String(targetId),parentId:String(parentId||''),sortTs:Number(sortTs||0),replaceUrl:String(replaceUrl||'')}});
   await txDone(tx);updateSyncUI();scheduleAutoSync();return opId;
 }
 async function saveBlob(blob){
@@ -132,6 +133,43 @@ async function saveBlob(blob){
 }
 async function getBlob(id){if(!id)return null;const db=await openDb(),tx=db.transaction('blobs','readonly');return reqP(tx.objectStore('blobs').get(id))}
 async function deleteBlob(id){if(!id)return;const db=await openDb(),tx=db.transaction('blobs','readwrite');tx.objectStore('blobs').delete(id);await txDone(tx)}
+
+function remoteImageUrl(payload){
+  const p=payload||{},u=String(p.imageUrl||p.image||'').trim();
+  return u&&!u.startsWith('data:')&&!u.startsWith('blob:')?u:'';
+}
+async function cancelPendingImageUploads(targetKind,targetId){
+  if(!targetKind||targetId===undefined||targetId===null)return [];
+  const db=await openDb(),tx=db.transaction('outbox','readwrite'),store=tx.objectStore('outbox'),blobIds=[];
+  await new Promise((resolve,reject)=>{const req=store.openCursor();req.onerror=()=>reject(req.error);req.onsuccess=()=>{const c=req.result;if(!c){resolve();return}const x=c.value,p=x.payload||{};if(x.kind==='__image_upload__'&&String(p.targetKind)===String(targetKind)&&String(p.targetId)===String(targetId)){if(p.blobId)blobIds.push(String(p.blobId));c.delete()}c.continue()}});await txDone(tx);
+  for(const id of [...new Set(blobIds)])await deleteBlob(id).catch(()=>{});
+  return blobIds;
+}
+async function queueImageDelete(url){
+  url=String(url||'').trim();if(!url||url.startsWith('data:')||url.startsWith('blob:'))return false;
+  const db=await openDb(),tx=db.transaction('outbox','readwrite'),store=tx.objectStore('outbox'),opId=`imgdel-${newOpId()}`;
+  store.put({opId,kind:'__image_delete__',createdAt:Date.now(),payload:{url}});await txDone(tx);updateSyncUI();scheduleAutoSync(250);return true;
+}
+async function deleteImageAsset(payload,targetKind,targetId){
+  const p=payload||{};await cancelPendingImageUploads(targetKind,targetId).catch(()=>{});
+  if(p.imageLocalId)await deleteBlob(p.imageLocalId).catch(()=>{});
+  const url=remoteImageUrl(p);if(url)await queueImageDelete(url);
+  return !!(url||p.imageLocalId);
+}
+async function deleteEntityAndImage(kind,id,options={},payloadOverride=null){
+  const item=payloadOverride?null:await getItem(kind,id).catch(()=>null),payload=payloadOverride||item?.payload||{};
+  await deleteImageAsset(payload,kind,id);return deleteEntity(kind,id,options);
+}
+async function processImageDeletes(max=8){
+  const ops=await getOutbox(max,x=>x.kind==='__image_delete__');
+  for(const op of ops){try{await api('/images/delete',{method:'POST',body:{url:op.payload?.url||''},timeout:22000});await deleteOutbox([op.opId])}catch(e){lastSyncError=e.message;break}}
+}
+async function downloadRecordImage(record,filename='CashTop_Image.jpg'){
+  const src=await resolveRecordImage(record);if(!src){toast('لا توجد صورة للتحميل','info');return false}
+  try{
+    const res=await fetch(src,{cache:'no-store'});if(!res.ok)throw new Error('download');const blob=await res.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename||`CashTop_Image_${Date.now()}.jpg`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1200);return true;
+  }catch(e){const a=document.createElement('a');a.href=src;a.download=filename||`CashTop_Image_${Date.now()}.jpg`;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();return true}
+}
 
 async function outboxCount(){
   if(!session?.company?.id)return 0;const db=await openDb(),tx=db.transaction('outbox','readonly');return reqP(tx.objectStore('outbox').count())
@@ -230,7 +268,11 @@ async function processImageUploads(max=4){
         const payload={...(item.payload||{}),image:data.url,imageUrl:data.url,imageLocalId:''};
         await putEntity(p.targetKind,p.targetId,payload,{parentId:item.parentId||p.parentId,sortTs:item.sortTs||p.sortTs,queue:true});
         applyImageUrlToLegacy(p.targetKind,p.targetId,data.url);
+      }else{
+        // The record may have been deleted while the upload was in flight. Do not leave an orphan file in Bunny.
+        await queueImageDelete(data.url);
       }
+      if(p.replaceUrl&&String(p.replaceUrl)!==String(data.url))await queueImageDelete(p.replaceUrl);
       await deleteOutbox([op.opId]);
       const remaining=await getOutbox(500,x=>x.kind==='__image_upload__'&&x.payload?.blobId===p.blobId);
       if(!remaining.length)await deleteBlob(p.blobId);
@@ -253,7 +295,7 @@ function applyImageUrlToLegacy(kind,id,url){
 }
 
 async function pushOutbox(){
-  const ops=await getOutbox(MAX_OUTBOX_BATCH,x=>x.kind!=='__image_upload__');
+  const ops=await getOutbox(MAX_OUTBOX_BATCH,x=>x.kind!=='__image_upload__'&&x.kind!=='__image_delete__');
   if(!ops.length)return 0;
   const payload=ops.map(x=>({opId:x.opId,kind:x.kind,id:x.id,parentId:x.parentId||'',sortTs:Number(x.sortTs||0),payload:x.payload||{},deleted:!!x.deleted}));
   const d=await api('/sync/push',{method:'POST',body:{ops:payload},timeout:25000});
@@ -301,7 +343,9 @@ async function syncNow(manual=false){
   syncLock=true;setSyncVisual('syncing');
   try{
     if(!(await validateSession(manual)))return false;
+    await processImageDeletes(manual?16:5);
     await processImageUploads(manual?8:3);
+    await processImageDeletes(manual?16:5);
     let loops=0;
     do{const n=await pushOutbox();loops++;if(!n||loops>=(manual?12:2))break}while(true);
     await pullRemote(manual);
@@ -441,11 +485,11 @@ async function restoreDebtArchiveBatch(parentId,rows){
 }
 async function deleteDebtArchiveBatch(parentId,rows){
   const list=Array.isArray(rows)?rows:[];let count=0;
-  for(const r of list){await deleteEntity('debt_archive_record',r.id,{parentId:String(parentId||personKey(r.name,r.type)),sortTs:r.timestamp||0});count++}
+  for(const r of list){await deleteEntityAndImage('debt_archive_record',r.id,{parentId:String(parentId||personKey(r.name,r.type)),sortTs:r.timestamp||0},r);count++}
   return count;
 }
 async function openDebtArchivedTransaction(id){
-  currentTransId=id;currentTransSource='debtArchive';currentArchivedDebtRecord=await getDebtArchiveRecord(id);if(!currentArchivedDebtRecord){toast('تعذر تحميل المعاملة المؤرشفة','error');return}
+  currentTransId=id;currentTransSource='debtArchive';currentArchivedDebtRecord=await getDebtArchiveRecord(id);window.__ctCurrentArchivedDebtRecord=currentArchivedDebtRecord;if(!currentArchivedDebtRecord){toast('تعذر تحميل المعاملة المؤرشفة','error');return}
   renderDebtArchivedTransaction(currentArchivedDebtRecord);
 }
 function renderDebtArchivedTransaction(r){
@@ -460,7 +504,7 @@ async function restoreDebtArchivedTransaction(){
   const r=currentArchivedDebtRecord;if(!r)return null;const parentId=personKey(r.name,r.type);await deleteEntity('debt_archive_record',r.id,{parentId,sortTs:r.timestamp||0});const restored={...r,archivedAt:undefined,archiveParentId:undefined};await putEntity('debt_record',r.id,restored,{parentId,sortTs:r.timestamp||0,queue:true});if(restored.imageLocalId){const moved=await retargetPendingImage(restored.id,'debt_archive_record','debt_record',parentId);if(!moved)await enqueueImage(restored.imageLocalId,'debt_record',restored.id,parentId,restored.timestamp||0)}return restored;
 }
 async function deleteDebtArchivedTransaction(){
-  const r=currentArchivedDebtRecord;if(!r)return false;await deleteEntity('debt_archive_record',r.id,{parentId:personKey(r.name,r.type),sortTs:r.timestamp||0});currentArchivedDebtRecord=null;return true;
+  const r=currentArchivedDebtRecord;if(!r)return false;await deleteEntityAndImage('debt_archive_record',r.id,{parentId:personKey(r.name,r.type),sortTs:r.timestamp||0},r);currentArchivedDebtRecord=null;window.__ctCurrentArchivedDebtRecord=null;return true;
 }
 
 window.renderArchiveSessions=function(){
@@ -544,7 +588,7 @@ window.resetArchiveWindow=()=>resetArchiveDetails();
 
 window.openArchivedTransaction=async function(sessionId,id){
   currentArchiveSessionId=sessionId;currentTransId=id;currentTransSource='archive';
-  currentArchivedRecord=await getArchiveRecord(sessionId,id);if(!currentArchivedRecord){toast('تعذر تحميل المعاملة','error');return}
+  currentArchivedRecord=await getArchiveRecord(sessionId,id);window.__ctCurrentArchivedRecord=currentArchivedRecord;if(!currentArchivedRecord){toast('تعذر تحميل المعاملة','error');return}
   renderArchivedTransaction(currentArchivedRecord);
 };
 const legacyGetCurrentTransaction=typeof getCurrentTransaction==='function'?getCurrentTransaction:null;
@@ -602,13 +646,13 @@ window.deleteSingleTransaction=async function(){
     await legacyDeleteSingle();
     const still=source==='cash'?cashRecords.some(x=>String(x.id)===String(id)):records.some(x=>String(x.id)===String(id));
     if(before&&!still){
-      if(source==='cash')await deleteEntity('cash_record',id,{sortTs:before.timestamp||0});
-      else await deleteEntity('debt_record',id,{parentId:personKey(before.name,before.type),sortTs:before.timestamp||0});
+      if(source==='cash')await deleteEntityAndImage('cash_record',id,{sortTs:before.timestamp||0},before);
+      else await deleteEntityAndImage('debt_record',id,{parentId:personKey(before.name,before.type),sortTs:before.timestamp||0},before);
     }
     return;
   }
   const r=currentArchivedRecord;if(!r)return;const c=await Swal.fire({title:'حذف المعاملة المؤرشفة؟',text:'سيتم حذفها من هذه الشركة عند المزامنة.',icon:'warning',showCancelButton:true,confirmButtonText:'حذف',confirmButtonColor:'#ef4444',cancelButtonText:'إلغاء'});if(!c.isConfirmed)return;
-  await deleteEntity('archive_record',r.id,{parentId:String(currentArchiveSessionId),sortTs:r.timestamp});await adjustArchiveSessionSummary(currentArchiveSessionId,r,null);closeSingleTransaction();await resetArchiveDetails();toast('تم حذف المعاملة')
+  await deleteEntityAndImage('archive_record',r.id,{parentId:String(currentArchiveSessionId),sortTs:r.timestamp},r);await adjustArchiveSessionSummary(currentArchiveSessionId,r,null);closeSingleTransaction();await resetArchiveDetails();toast('تم حذف المعاملة')
 };
 
 async function restoreCashArchivedTransaction(){
@@ -618,7 +662,7 @@ async function restoreCashArchivedTransaction(){
   await putEntity('cash_record',restored.id,restored,{sortTs:restored.timestamp||Date.now(),queue:true});
   if(restored.imageLocalId){const moved=await retargetPendingImage(restored.id,'archive_record','cash_record','');if(!moved)await enqueueImage(restored.imageLocalId,'cash_record',restored.id,'',restored.timestamp||Date.now())}
   await adjustArchiveSessionSummary(currentArchiveSessionId,r,null);
-  currentArchivedRecord=null;
+  currentArchivedRecord=null;window.__ctCurrentArchivedRecord=null;
   return restored;
 }
 async function adjustArchiveSessionSummary(sessionId,oldRec,newRec){
@@ -719,8 +763,8 @@ window.handleProfileImage=async function(event){
   try{const blob=await compressImageUnder50KB(file,50),blobId=await saveBlob(blob),preview=URL.createObjectURL(blob);localObjectUrls.add(preview);pendingProfileImage={blobId,preview,size:blob.size};renderSettingsAvatar();toast('تم ضغط الشعار محلياً')}catch(e){toast(e.message||'تعذر ضغط الصورة','error')}
 };
 window.renderSettingsAvatar=function(){
-  const w=document.getElementById('settings-avatar-wrap');if(!w)return;
-  const src=typeof pendingProfileImage==='object'?pendingProfileImage.preview:(pendingProfileImage||profile.image||'');w.className=src?'profile-avatar overflow-hidden':'profile-placeholder';w.innerHTML=src?`<img src="${escapeHTML(src)}" class="w-full h-full object-cover" alt="">`:'<i class="fas fa-store"></i>';
+  const w=document.getElementById('settings-avatar-wrap'),b=document.getElementById('settings-logo-download');if(!w)return;
+  const src=typeof pendingProfileImage==='object'?pendingProfileImage.preview:(pendingProfileImage||profile.imageUrl||profile.image||'');w.className=src?'profile-avatar overflow-hidden':'profile-placeholder';w.innerHTML=src?`<img src="${escapeHTML(src)}" class="w-full h-full object-cover" alt="">`:'<i class="fas fa-store"></i>';if(b)b.classList.toggle('hidden',!src);
 };
 const legacyOpenSettings=openSettings;
 window.openSettings=function(){
@@ -728,9 +772,10 @@ window.openSettings=function(){
 };
 window.saveSettings=async function(){
   const name=document.getElementById('settings-name').value.trim()||'كاش توب',phone=document.getElementById('settings-phone').value.trim(),address=document.getElementById('settings-address').value.trim();
-  const imgObj=typeof pendingProfileImage==='object'?pendingProfileImage:null;
-  profile={...profile,name,phone,address};if(imgObj){profile.image='';profile.imageUrl='';profile.imageLocalId=imgObj.blobId}else if(typeof pendingProfileImage==='string')profile.image=pendingProfileImage;
-  saveData();await putEntity('profile','main',profile,{sortTs:Date.now(),queue:true});if(imgObj)await enqueueImage(imgObj.blobId,'profile','main','',Date.now());renderProfileUI();closeSettings();toast('تم حفظ الإعدادات')
+  const imgObj=typeof pendingProfileImage==='object'?pendingProfileImage:null,oldProfile={...profile},oldLogoUrl=remoteImageUrl(oldProfile);
+  if(imgObj){await cancelPendingImageUploads('profile','main').catch(()=>{});if(oldProfile.imageLocalId)await deleteBlob(oldProfile.imageLocalId).catch(()=>{})}
+  profile={...profile,name,phone,address};if(imgObj){profile.image='';profile.imageUrl='';profile.imageLocalId=imgObj.blobId}else if(typeof pendingProfileImage==='string'){profile.image=pendingProfileImage;profile.imageUrl=String(pendingProfileImage||'');}
+  saveData();await putEntity('profile','main',profile,{sortTs:Date.now(),queue:true});if(imgObj)await enqueueImage(imgObj.blobId,'profile','main','',Date.now(),oldLogoUrl);renderProfileUI();closeSettings();toast('تم حفظ الإعدادات')
 };
 
 // ---------------- One-time legacy migration ----------------

@@ -145,6 +145,16 @@ async function request(path,opt={}){
   if(p==='/images/upload'&&method==='POST'){
     const c=await requireCompany(token),fd=opt.form,file=fd?.get?.('file');if(!(file instanceof Blob))throw err(400,'ملف الصورة مطلوب');if(file.size>MAX_IMAGE_BYTES)throw err(413,'يجب ضغط الصورة إلى 50KB أو أقل قبل الرفع');if(!/^image\/(jpeg|jpg)$/i.test(file.type||''))throw err(415,'الصورة يجب أن تكون JPEG بعد الضغط');const safe=(v,f='item')=>(String(v||'').trim().replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||f).slice(0,80),folder=safe(fd.get('folder')||'misc','misc'),entity=safe(fd.get('entityId')||'item','item'),root=safe(CFG.BUNNY_ROOT_FOLDER,'cashtop-images'),tenant=safe(c.id,'company'),path=`${root}/${tenant}/${folder}/${entity}_${Date.now()}_${crypto.randomUUID().slice(0,8)}.jpg`,endpoint=`https://storage.bunnycdn.com/${encodeURIComponent(CFG.BUNNY_STORAGE_ZONE)}/${path.split('/').map(encodeURIComponent).join('/')}`;const r=await fetch(endpoint,{method:'PUT',headers:{AccessKey:CFG.BUNNY_ACCESS_KEY,'Content-Type':'image/jpeg'},body:file});if(!r.ok)throw err(502,'فشل رفع الصورة إلى Bunny ('+r.status+')');return{ok:true,url:CFG.BUNNY_PULL_ZONE_URL.replace(/\/+$/,'')+'/'+path.split('/').map(encodeURIComponent).join('/'),size:file.size,storage:'bunny'};
   }
+  if(p==='/images/delete'&&method==='POST'){
+    const c=await requireCompany(token),raw=String(body.url||'').trim();if(!raw)return{ok:true,deleted:false,reason:'empty'};
+    let url;try{url=new URL(raw)}catch{return{ok:true,deleted:false,reason:'invalid'}}
+    const pull=new URL(CFG.BUNNY_PULL_ZONE_URL),safe=(v,f='item')=>(String(v||'').trim().replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||f).slice(0,80),root=safe(CFG.BUNNY_ROOT_FOLDER,'cashtop-images'),tenant=safe(c.id,'company');
+    if(url.hostname!==pull.hostname)return{ok:true,deleted:false,reason:'external'};
+    let path='';try{path=url.pathname.replace(/^\/+/, '').split('/').map(x=>decodeURIComponent(x)).join('/')}catch{return{ok:true,deleted:false,reason:'invalid-path'}}
+    const prefix=`${root}/${tenant}/`;if(!path.startsWith(prefix)||path.includes('..'))throw err(403,'لا يمكن حذف صورة خارج مساحة الشركة');
+    const endpoint=`https://storage.bunnycdn.com/${encodeURIComponent(CFG.BUNNY_STORAGE_ZONE)}/${path.split('/').map(encodeURIComponent).join('/')}`;
+    const r=await fetch(endpoint,{method:'DELETE',headers:{AccessKey:CFG.BUNNY_ACCESS_KEY}});if(!r.ok&&r.status!==404)throw err(502,'فشل حذف الصورة من Bunny ('+r.status+')');return{ok:true,deleted:r.status!==404,url:raw};
+  }
   throw err(404,'المسار غير موجود');
 }
 
